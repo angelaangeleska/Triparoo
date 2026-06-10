@@ -7,3 +7,13 @@
 # Python cache
 __pycache__/
 *.pyc
+
+# Environment
+.env
+
+# Test cache
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
