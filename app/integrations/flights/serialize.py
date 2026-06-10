@@ -1,5 +1,11 @@
 from app.integrations.flights.base import FlightOffer
-from app.integrations.flights.details import format_duration
+
+
+def format_duration(minutes: int) -> str:
+    hours, mins = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {mins}m"
+    return f"{mins}m"
 
 
 def offer_to_leg(offer: FlightOffer, party_size: int) -> dict:

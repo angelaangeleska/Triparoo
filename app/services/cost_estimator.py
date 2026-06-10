@@ -2,8 +2,6 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.integrations.accommodations.base import AccommodationSearchCriteria
-from app.integrations.accommodations.mock_accommodation import MockAccommodationProvider
 from app.integrations.flights.base import FlightOffer, FlightSearchCriteria
 from app.integrations.flights.factory import get_flight_provider
 from app.integrations.flights.serialize import build_flight_summary
@@ -15,7 +13,6 @@ class CostEstimatorService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.flight_provider = get_flight_provider(session)
-        self.accommodation_provider = MockAccommodationProvider(session)
         self.origin_resolver = OriginResolverService(session)
 
     async def _best_round_trip(
@@ -126,16 +123,10 @@ class CostEstimatorService:
                     flight_cost = self._trip_flight_cost(best_out, best_return)
                     flight_offer_data = build_flight_summary(best_out, party_size, best_return, best_alts)
 
-        acc_offers = await self.accommodation_provider.search(
-            AccommodationSearchCriteria(
-                destination_id=destination.id,
-                check_in=start_date,
-                check_out=end_date,
-                party_size=party_size,
-            )
-        )
-        accommodation_cost = acc_offers[0].total_price if acc_offers else 100.0 * nights
-        acc_name = acc_offers[0].name if acc_offers else "Estimated hotel"
+        # Accommodation cost is estimated here; real hotel search is a separate /hotels endpoint
+        accommodation_cost = round(100.0 * nights * party_size * 0.5, 2)
+        acc_name = "Hotel (estimated)"
+        acc_data = None
 
         activity_cost = 0.0
         if destination.attractions:
@@ -154,4 +145,5 @@ class CostEstimatorService:
             "same_origin": same_origin,
             "flight_offer": flight_offer_data,
             "accommodation_name": acc_name,
+            "accommodation_offer": acc_data,
         }

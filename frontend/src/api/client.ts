@@ -1,5 +1,6 @@
 import type {
   Accommodation,
+  AccommodationSummary,
   Airport,
   AirportSearchResult,
   Attraction,
@@ -106,6 +107,11 @@ export const api = {
 
   accommodations: (destinationId?: number) =>
     request<Accommodation[]>(`/accommodations${destinationId ? `?destination_id=${destinationId}` : ''}`),
+
+  searchHotels: (city: string, checkIn: string, checkOut: string, adults = 2, children = 0) =>
+    request<AccommodationSummary[]>(
+      `/trip-planner/hotels?city=${encodeURIComponent(city)}&check_in=${checkIn}&check_out=${checkOut}&adults=${adults}&children=${children}`
+    ),
 
   recommend: (data: {
     members: TripMember[]

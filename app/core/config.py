@@ -19,13 +19,15 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     RECOMMENDATION_PROVIDER: str = "mock"
-    FLIGHT_PROVIDER: str = "amadeus"
-    ACCOMMODATION_PROVIDER: str = "mock"
+    FLIGHT_PROVIDER: str = "serpapi"
+    ACCOMMODATION_PROVIDER: str = "serpapi"
 
     AMADEUS_CLIENT_ID: str = ""
     AMADEUS_CLIENT_SECRET: str = ""
     AMADEUS_BASE_URL: str = "https://test.api.amadeus.com"
     AMADEUS_FALLBACK_TO_ESTIMATES: bool = False
+
+    SERPAPI_API_KEY: str = ""
 
     # Rule engine weights (sum used for normalization)
     WEIGHT_CHILD_AGE: float = 0.20

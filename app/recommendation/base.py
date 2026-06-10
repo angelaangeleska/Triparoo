@@ -34,6 +34,7 @@ class ScoredDestination:
     accommodation_cost: float = 0.0
     activity_cost: float = 0.0
     flight_offer: dict | None = None
+    accommodation_offer: dict | None = None
 
 
 @dataclass

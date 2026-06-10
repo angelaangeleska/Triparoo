@@ -53,6 +53,13 @@ class OriginResolverService:
         direct = [r for r in results if r.match_type in ("direct", "iata")]
         if direct:
             best = direct[0]
+            # Group airports that belong to the same city as the top result
+            same_city = [r for r in direct if r.city_name.lower() == best.city_name.lower()]
+            if len(same_city) > 1:
+                iata_list = ", ".join(r.iata_code for r in same_city)
+                msg = f"Departing from {best.city_name} — {len(same_city)} airports ({iata_list})"
+            else:
+                msg = f"Departing from {best.city_name} ({best.iata_code})"
             return ResolvedOrigin(
                 query=q,
                 location_type="airport",
@@ -61,7 +68,7 @@ class OriginResolverService:
                 airport_ids=[r.id for r in direct],
                 primary_airport_id=best.id,
                 primary_iata=best.iata_code,
-                message=f"Departing from {best.city_name} ({best.iata_code})",
+                message=msg,
             )
 
         closest = [r for r in results if r.match_type == "closest"]

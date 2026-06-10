@@ -86,6 +86,33 @@ class FlightSummary(BaseModel):
     source: str = "global-estimate"
 
 
+class BookingSourceSummary(BaseModel):
+    name: str
+    price_per_night: float
+    total_price: float
+    currency: str = "USD"
+    url: str
+
+
+class AccommodationSummary(BaseModel):
+    name: str
+    type: str = ""
+    hotel_class: str = ""
+    rating: Optional[float] = None
+    reviews_count: Optional[int] = None
+    price_per_night: float
+    total_price: float
+    currency: str = "USD"
+    family_friendly: bool = False
+    image_url: str = ""
+    google_url: str = ""
+    booking_sources: list[BookingSourceSummary] = []
+    amenities: list[str] = []
+    check_in_time: str = ""
+    check_out_time: str = ""
+    source: str = "mock"
+
+
 class DestinationRecommendation(BaseModel):
     destination_id: int
     city: str
@@ -98,6 +125,7 @@ class DestinationRecommendation(BaseModel):
     accommodation_cost: float = 0.0
     activity_cost: float = 0.0
     flight: Optional[FlightSummary] = None
+    accommodation: Optional[AccommodationSummary] = None
     score_breakdown: ScoreBreakdown
     explanation: str
     suggested_attractions: list[AttractionSummary]

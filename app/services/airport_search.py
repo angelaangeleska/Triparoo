@@ -35,7 +35,6 @@ class AirportSearchService:
     def _result_id(self, iata: str, db_map: dict[str, int]) -> int:
         if iata in db_map:
             return db_map[iata]
-        # Stable synthetic id for airports not in the trip-destination database
         return 1_000_000_000 + abs(hash(iata)) % 900_000_000
 
     async def search(self, query: str, limit: int = 20) -> list[AirportSearchResult]:
@@ -45,10 +44,9 @@ class AirportSearchService:
 
         db_map = await self._db_iata_map()
         catalog_hits = self.catalog.search(q, limit=limit)
-        results: list[AirportSearchResult] = []
 
-        for ap, match_type, distance_km, note in catalog_hits:
-            results.append(
+        if catalog_hits:
+            return [
                 AirportSearchResult(
                     id=self._result_id(ap.iata, db_map),
                     name=ap.name,
@@ -59,30 +57,20 @@ class AirportSearchService:
                     distance_km=round(distance_km, 1) if distance_km is not None else None,
                     note=note,
                 )
-            )
+                for ap, match_type, distance_km, note in catalog_hits
+            ]
 
-        if results:
-            priority = {"iata": 0, "direct": 1, "closest": 2, "country": 3}
-            results.sort(
-                key=lambda r: (
-                    priority.get(r.match_type, 9),
-                    r.distance_km or 0,
-                    r.city_name,
-                )
-            )
-            return results[:limit]
-
-        # Legacy DB-only fallback (destination seed airports)
+        # Legacy DB-only fallback
         airport_result = await self.session.execute(
             select(Airport).options(selectinload(Airport.city).selectinload(City.country))
         )
         q_lower = q.lower()
+        results: list[AirportSearchResult] = []
         for airport in airport_result.scalars().unique().all():
             city = airport.city
             country = city.country if city else None
             if (
                 q_lower in airport.iata_code.lower()
-                or q_lower in airport.name.lower()
                 or (city and q_lower in city.name.lower())
             ):
                 results.append(
@@ -99,11 +87,12 @@ class AirportSearchService:
 
     async def iata_for_id(self, airport_id: int) -> str | None:
         if airport_id >= 1_000_000_000:
-            for iata, db_id in (await self._db_iata_map()).items():
+            db_map = await self._db_iata_map()
+            for iata, db_id in db_map.items():
                 if db_id == airport_id:
                     return iata
             for ap in self.catalog.airports:
-                if self._result_id(ap.iata, await self._db_iata_map()) == airport_id:
+                if self._result_id(ap.iata, db_map) == airport_id:
                     return ap.iata
             return None
         result = await self.session.execute(select(Airport.iata_code).where(Airport.id == airport_id))

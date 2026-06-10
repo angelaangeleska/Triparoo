@@ -4,14 +4,18 @@ import type { DestinationRecommendation } from '../../types'
 import { CITY_IMAGES, DEFAULT_CITY_IMAGE } from '../../types'
 import { normalizeFlightSummary } from '../../utils/flight'
 import FlightTicketCard from './FlightTicketCard'
+import HotelCard from './HotelCard'
 import ScoreBreakdownChart from './ScoreBreakdownChart'
 
 interface Props {
   rec: DestinationRecommendation
   rank: number
+  startDate?: string
+  endDate?: string
+  partySize?: number
 }
 
-export default function RecommendationCard({ rec, rank }: Props) {
+export default function RecommendationCard({ rec, rank, startDate, endDate, partySize }: Props) {
   const image = CITY_IMAGES[rec.city] || DEFAULT_CITY_IMAGE
   const flight = normalizeFlightSummary(rec.flight)
 
@@ -57,6 +61,15 @@ export default function RecommendationCard({ rec, rank }: Props) {
             </div>
           ) : null}
 
+          {rec.accommodation && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-brand-500 uppercase tracking-wider">
+                Top hotel pick
+              </p>
+              <HotelCard hotel={rec.accommodation} />
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2 text-xs text-brand-600">
             {rec.flight_cost > 0 && (
               <span className="px-2.5 py-1 rounded-lg bg-sand-100">Flights €{rec.flight_cost.toFixed(2)}</span>
@@ -90,6 +103,7 @@ export default function RecommendationCard({ rec, rank }: Props) {
 
           <Link
             to={`/destinations/${rec.destination_id}`}
+            state={{ startDate, endDate, partySize }}
             className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors group/link"
           >
             Explore {rec.city}

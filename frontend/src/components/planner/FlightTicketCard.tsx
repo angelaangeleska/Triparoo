@@ -1,4 +1,4 @@
-import { Calendar, Clock, Luggage, Plane, Users } from 'lucide-react'
+import { Calendar, Clock, Plane } from 'lucide-react'
 import type { FlightLegSummary, FlightSummary } from '../../types'
 
 function formatDateTime(iso: string) {
@@ -50,52 +50,40 @@ function FlightLeg({ leg, label }: { leg: FlightLegSummary; label: string }) {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-[1fr_auto_1fr] gap-3 items-center">
-        <div>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+        <div className="min-w-0">
           <p className="text-2xl font-bold text-brand-900">{leg.origin_iata}</p>
-          <p className="text-sm text-brand-700">{leg.origin_city}</p>
+          <p className="text-sm text-brand-700 truncate">{leg.origin_city}</p>
           <p className="text-xs text-brand-500 truncate" title={leg.origin_airport}>{leg.origin_airport}</p>
         </div>
-        <div className="flex flex-col items-center text-brand-400 px-2">
+        <div className="flex flex-col items-center text-brand-400 px-2 shrink-0">
           <Plane className="w-5 h-5 rotate-90" />
-          <span className="text-xs font-medium text-brand-500 mt-1">{leg.duration}</span>
+          <span className="text-xs font-medium text-brand-500 mt-1 whitespace-nowrap">{leg.duration}</span>
         </div>
-        <div className="sm:text-right">
+        <div className="min-w-0 text-right">
           <p className="text-2xl font-bold text-brand-900">{leg.destination_iata}</p>
-          <p className="text-sm text-brand-700">{leg.destination_city}</p>
+          <p className="text-sm text-brand-700 truncate">{leg.destination_city}</p>
           <p className="text-xs text-brand-500 truncate" title={leg.destination_airport}>{leg.destination_airport}</p>
         </div>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-2 text-sm text-brand-700">
-        <p className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-brand-400 shrink-0" />
-          <span>
+        <p className="flex items-start gap-2 min-w-0">
+          <Calendar className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+          <span className="min-w-0">
             <span className="text-brand-500 text-xs block">Departs</span>
-            {formatDateTime(leg.departure_date)}
+            <span className="break-words">{formatDateTime(leg.departure_date)}</span>
           </span>
         </p>
-        <p className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-brand-400 shrink-0" />
-          <span>
+        <p className="flex items-start gap-2 min-w-0">
+          <Clock className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+          <span className="min-w-0">
             <span className="text-brand-500 text-xs block">Arrives</span>
-            {formatDateTime(leg.arrival_date)}
+            <span className="break-words">{formatDateTime(leg.arrival_date)}</span>
           </span>
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3 text-xs text-brand-600">
-        <span className="flex items-center gap-1">
-          <Users className="w-3.5 h-3.5" />
-          {leg.seats_remaining} seats left
-        </span>
-        {leg.baggage && (
-          <span className="flex items-center gap-1">
-            <Luggage className="w-3.5 h-3.5" />
-            {leg.baggage}
-          </span>
-        )}
-      </div>
     </div>
   )
 }

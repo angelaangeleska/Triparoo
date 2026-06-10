@@ -131,6 +131,33 @@ export interface FlightSummary {
   source: string
 }
 
+export interface BookingSource {
+  name: string
+  price_per_night: number
+  total_price: number
+  currency: string
+  url: string
+}
+
+export interface AccommodationSummary {
+  name: string
+  type: string
+  hotel_class: string
+  rating?: number | null
+  reviews_count?: number | null
+  price_per_night: number
+  total_price: number
+  currency: string
+  family_friendly: boolean
+  image_url: string
+  google_url: string
+  booking_sources: BookingSource[]
+  amenities: string[]
+  check_in_time: string
+  check_out_time: string
+  source: string
+}
+
 export interface DestinationRecommendation {
   destination_id: number
   city: string
@@ -143,6 +170,7 @@ export interface DestinationRecommendation {
   accommodation_cost: number
   activity_cost: number
   flight?: FlightSummary | null
+  accommodation?: AccommodationSummary | null
   score_breakdown: ScoreBreakdown
   explanation: string
   suggested_attractions: {

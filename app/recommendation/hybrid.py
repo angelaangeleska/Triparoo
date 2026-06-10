@@ -1,6 +1,5 @@
 from app.core.config import settings
 from app.recommendation.base import RecommendationContext, ScoredDestination
-from app.recommendation.mock_llm import MockLLMProvider
 from app.recommendation.rule_engine import RuleBasedScorer
 
 
@@ -8,10 +7,8 @@ class HybridRecommendationService:
     def __init__(
         self,
         rule_scorer: RuleBasedScorer | None = None,
-        llm_provider: MockLLMProvider | None = None,
     ):
         self.rule_scorer = rule_scorer or RuleBasedScorer()
-        self.llm_provider = llm_provider or MockLLMProvider()
 
     def _origin_flight_boost(self, context: RecommendationContext, flight_cost: float) -> float:
         if not context.origin_airport_id or flight_cost <= 0:
@@ -51,36 +48,31 @@ class HybridRecommendationService:
                     accommodation_cost=cost.get("accommodation", 0.0),
                     activity_cost=cost.get("activity", 0.0),
                     flight_offer=cost.get("flight_offer"),
+                    accommodation_offer=cost.get("accommodation_offer"),
                 )
             )
 
         scored.sort(key=lambda s: (s.rule_score, -s.estimated_total_cost), reverse=True)
         top = scored[:10]
-        explanations = await self.llm_provider.explain_recommendations(context, top)
-        expl_map = {e.destination_id: e for e in explanations}
 
         results = []
         for s in top:
-            expl = expl_map.get(s.destination_id)
-            llm_score = expl.llm_score if expl else s.rule_score
-            final = (
-                settings.HYBRID_RULE_WEIGHT * s.rule_score + settings.HYBRID_LLM_WEIGHT * llm_score
-            )
             results.append(
                 {
                     "destination_id": s.destination_id,
                     "city": s.city,
                     "country": s.country,
                     "rule_score": s.rule_score,
-                    "llm_score": llm_score,
-                    "final_score": round(final, 2),
+                    "llm_score": s.rule_score,
+                    "final_score": round(s.rule_score, 2),
                     "estimated_total_cost": s.estimated_total_cost,
                     "flight_cost": s.flight_cost,
                     "accommodation_cost": s.accommodation_cost,
                     "activity_cost": s.activity_cost,
                     "flight_offer": s.flight_offer,
+                    "accommodation_offer": s.accommodation_offer,
                     "score_breakdown": s.score_breakdown,
-                    "explanation": expl.explanation if expl else "",
+                    "explanation": "",
                     "suggested_attraction_ids": s.suggested_attraction_ids,
                 }
             )

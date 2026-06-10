@@ -8,10 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
 from app.core.security import decode_token
 from app.db.session import get_async_session
-from app.integrations.accommodations.mock_accommodation import MockAccommodationProvider
 from app.integrations.flights.factory import get_flight_provider
 from app.models.user import User
-from app.recommendation.mock_llm import MockLLMProvider
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -56,13 +54,6 @@ async def get_optional_user(
 def get_flight_provider_dep(session: AsyncSession = Depends(get_db)):
     return get_flight_provider(session)
 
-
-def get_accommodation_provider(session: AsyncSession = Depends(get_db)) -> MockAccommodationProvider:
-    return MockAccommodationProvider(session)
-
-
-def get_recommendation_provider() -> MockLLMProvider:
-    return MockLLMProvider()
 
 
 def handle_app_exception(exc: AppException) -> HTTPException:

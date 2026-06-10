@@ -10,7 +10,6 @@ import httpx
 from app.core.config import settings
 from app.integrations.flights.airline_names import airline_name
 from app.integrations.flights.base import FlightOffer, FlightSearchCriteria
-from app.integrations.flights.global_flight import GlobalFlightProvider
 from app.services.airport_catalog import get_airport_catalog
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,6 @@ class AmadeusFlightProvider:
     def __init__(self, session=None):
         self.session = session
         self._token: str | None = None
-        self._fallback = GlobalFlightProvider(session)
         self.catalog = get_airport_catalog()
 
     @property
@@ -170,8 +168,6 @@ class AmadeusFlightProvider:
     async def search(self, criteria: FlightSearchCriteria) -> list[FlightOffer]:
         if not self.enabled:
             logger.warning("Amadeus credentials missing — set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET in .env")
-            if settings.AMADEUS_FALLBACK_TO_ESTIMATES:
-                return await self._fallback.search(criteria)
             return []
 
         origin = criteria.origin_iata.upper()
@@ -227,6 +223,4 @@ class AmadeusFlightProvider:
         except Exception as exc:
             logger.error("Amadeus search failed: %s", exc)
 
-        if settings.AMADEUS_FALLBACK_TO_ESTIMATES:
-            return await self._fallback.search(criteria)
         return []

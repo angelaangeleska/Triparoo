@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Baby,
@@ -18,7 +18,7 @@ import {
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type {
-  Accommodation,
+  AccommodationSummary,
   Attraction,
   BudgetAlternative,
   CheapestPeriod,
@@ -27,6 +27,7 @@ import type {
   ItineraryDay,
   TripMember,
 } from '../types'
+import HotelCard from '../components/planner/HotelCard'
 import { CITY_IMAGES, DEFAULT_CITY_IMAGE, INTEREST_OPTIONS, MONTHS } from '../types'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
@@ -37,10 +38,13 @@ export default function DestinationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const tripState = location.state as { startDate?: string; endDate?: string; partySize?: number } | null
 
   const [destination, setDestination] = useState<Destination | null>(null)
   const [attractions, setAttractions] = useState<Attraction[]>([])
-  const [accommodations, setAccommodations] = useState<Accommodation[]>([])
+  const [hotels, setHotels] = useState<AccommodationSummary[]>([])
+  const [hotelsLoading, setHotelsLoading] = useState(false)
   const [tab, setTab] = useState<Tab>('overview')
   const [loading, setLoading] = useState(true)
 
@@ -80,15 +84,26 @@ export default function DestinationDetailPage() {
 
   useEffect(() => {
     if (!destId) return
-    Promise.all([
-      api.destination(destId),
-      api.attractions(destId),
-      api.accommodations(destId),
-    ])
-      .then(([dest, att, acc]) => {
+    Promise.all([api.destination(destId), api.attractions(destId)])
+      .then(([dest, att]) => {
         setDestination(dest)
         setAttractions(att)
-        setAccommodations(acc)
+        // Load hotels once we know the city name
+        const city = dest.city
+        if (!city) return
+        const today = new Date()
+        const checkIn = tripState?.startDate || (() => {
+          const d = new Date(today); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10)
+        })()
+        const checkOut = tripState?.endDate || (() => {
+          const d = new Date(today); d.setDate(d.getDate() + 35); return d.toISOString().slice(0, 10)
+        })()
+        const adults = tripState?.partySize ?? 2
+        setHotelsLoading(true)
+        api.searchHotels(city, checkIn, checkOut, adults)
+          .then(setHotels)
+          .catch((err) => { console.error('Hotels error:', err); setError(`Hotels: ${err?.message || err}`) })
+          .finally(() => setHotelsLoading(false))
       })
       .catch(() => setError('Destination not found'))
       .finally(() => setLoading(false))
@@ -274,26 +289,17 @@ export default function DestinationDetailPage() {
               <div>
                 <h2 className="font-display text-2xl font-bold text-brand-900 mb-4 flex items-center gap-2">
                   <Bed className="w-6 h-6 text-brand-500" />
-                  Accommodations
+                  Hotels
                 </h2>
-                <div className="space-y-3">
-                  {accommodations.map((a) => (
-                    <div key={a.id} className="glass rounded-xl p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold text-brand-900">{a.name}</h3>
-                          <p className="text-xs text-brand-500 capitalize mt-0.5">{a.type}</p>
-                        </div>
-                        <span className="text-sm font-bold text-brand-700">€{a.price_per_night}/night</span>
-                      </div>
-                      <div className="flex gap-3 mt-2 text-xs text-brand-600">
-                        {a.rating && <span className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" />{a.rating}</span>}
-                        {a.family_friendly && <span className="text-emerald-600 font-medium">Family friendly</span>}
-                        <span>Up to {a.max_guests} guests</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {hotelsLoading && <LoadingSpinner message="Finding hotels..." />}
+                {!hotelsLoading && hotels.length > 0 && (
+                  <div className="space-y-3">
+                    {hotels.map((h, i) => <HotelCard key={i} hotel={h} />)}
+                  </div>
+                )}
+                {!hotelsLoading && hotels.length === 0 && (
+                  <p className="text-sm text-brand-500 text-center py-6">No hotels found.</p>
+                )}
               </div>
             </div>
           </FadeIn>
