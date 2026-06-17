@@ -97,10 +97,9 @@ class ItineraryService:
                     total_cost += att.price * len(request.members)
                 title = f"Day {day_num}: Arrival in {dest.city.name if dest.city else 'destination'}"
             elif day_num == request.duration_days:
-                items.append(ItineraryDayItem(time="Morning", activity="Souvenir shopping & leisure", estimated_cost=30))
+                items.append(ItineraryDayItem(time="Morning", activity="Souvenir shopping & leisure", estimated_cost=0))
                 items.append(ItineraryDayItem(time="Afternoon", activity="Departure", estimated_cost=0))
                 title = f"Day {day_num}: Departure"
-                total_cost += 30
             else:
                 att_idx = (day_num - 2) % max(len(attractions), 1)
                 if attractions:
@@ -116,9 +115,8 @@ class ItineraryService:
                     total_cost += att.price * len(request.members)
                     title = f"Day {day_num}: {att.name}"
                 else:
-                    items.append(ItineraryDayItem(time="Full day", activity="City exploration", estimated_cost=20))
+                    items.append(ItineraryDayItem(time="Full day", activity="City exploration", estimated_cost=0))
                     title = f"Day {day_num}: Explore the city"
-                    total_cost += 20
 
             days.append(ItineraryDayRead(day_number=day_num, title=title, items=items))
 

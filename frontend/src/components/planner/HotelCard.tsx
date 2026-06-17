@@ -1,4 +1,5 @@
-import { ExternalLink, Star, Wifi } from 'lucide-react'
+import { useState } from 'react'
+import { Bed, ExternalLink, Star, Wifi } from 'lucide-react'
 import type { AccommodationSummary } from '../../types'
 
 function formatMoney(amount: number, currency = 'USD') {
@@ -15,21 +16,32 @@ interface Props {
 }
 
 export default function HotelCard({ hotel }: Props) {
+  const [imageFailed, setImageFailed] = useState(false)
   const primarySource = hotel.booking_sources[0] ?? null
   const bookingUrl = primarySource?.url || hotel.google_url
+  const showImage = Boolean(hotel.image_url) && !imageFailed
 
   return (
     <div className="rounded-xl border border-brand-100 bg-white/80 overflow-hidden">
-      <div className="flex gap-0">
-        {hotel.image_url && (
-          <div className="w-28 shrink-0 relative">
+      <div className="flex gap-0 min-h-[7rem]">
+        <div className="w-28 shrink-0 relative bg-brand-50">
+          {showImage ? (
             <img
               src={hotel.image_url}
               alt={hotel.name}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageFailed(true)}
               className="absolute inset-0 w-full h-full object-cover"
             />
-          </div>
-        )}
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-brand-300 bg-gradient-to-br from-brand-50 to-sand-100">
+              <Bed className="w-7 h-7" />
+              <span className="text-[10px] font-medium uppercase tracking-wide">No photo</span>
+            </div>
+          )}
+        </div>
 
         <div className="flex-1 p-3 min-w-0 space-y-2">
           <div className="flex items-start justify-between gap-2">

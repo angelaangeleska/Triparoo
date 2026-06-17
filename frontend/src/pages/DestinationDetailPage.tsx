@@ -72,9 +72,19 @@ export default function DestinationDetailPage() {
   } | null>(null)
 
   const [error, setError] = useState('')
+  const [hotelsError, setHotelsError] = useState('')
 
   const destId = parseInt(id || '0')
   const image = CITY_IMAGES[destination?.city || ''] || DEFAULT_CITY_IMAGE
+
+  function localDateOffset(days: number): string {
+    const d = new Date()
+    d.setDate(d.getDate() + days)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
 
   const defaultMembers: TripMember[] = [
     { age: 35, interests: [] },
@@ -90,19 +100,19 @@ export default function DestinationDetailPage() {
         setAttractions(att)
         // Load hotels once we know the city name
         const city = dest.city
+        const country = dest.country
         if (!city) return
-        const today = new Date()
-        const checkIn = tripState?.startDate || (() => {
-          const d = new Date(today); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10)
-        })()
-        const checkOut = tripState?.endDate || (() => {
-          const d = new Date(today); d.setDate(d.getDate() + 35); return d.toISOString().slice(0, 10)
-        })()
+        const checkIn = tripState?.startDate || localDateOffset(30)
+        const checkOut = tripState?.endDate || localDateOffset(35)
         const adults = tripState?.partySize ?? 2
         setHotelsLoading(true)
-        api.searchHotels(city, checkIn, checkOut, adults)
+        setHotelsError('')
+        api.searchHotels(city, checkIn, checkOut, adults, 0, country || '')
           .then(setHotels)
-          .catch((err) => { console.error('Hotels error:', err); setError(`Hotels: ${err?.message || err}`) })
+          .catch((err) => {
+            console.error('Hotels error:', err)
+            setHotelsError(err instanceof ApiError ? err.message : 'Could not load hotels')
+          })
           .finally(() => setHotelsLoading(false))
       })
       .catch(() => setError('Destination not found'))
@@ -292,13 +302,18 @@ export default function DestinationDetailPage() {
                   Hotels
                 </h2>
                 {hotelsLoading && <LoadingSpinner message="Finding hotels..." />}
+                {hotelsError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3">
+                    {hotelsError}
+                  </p>
+                )}
                 {!hotelsLoading && hotels.length > 0 && (
                   <div className="space-y-3">
                     {hotels.map((h, i) => <HotelCard key={i} hotel={h} />)}
                   </div>
                 )}
-                {!hotelsLoading && hotels.length === 0 && (
-                  <p className="text-sm text-brand-500 text-center py-6">No hotels found.</p>
+                {!hotelsLoading && !hotelsError && hotels.length === 0 && (
+                  <p className="text-sm text-brand-500 text-center py-6">No hotels found for these dates.</p>
                 )}
               </div>
             </div>
@@ -438,7 +453,7 @@ export default function DestinationDetailPage() {
                       <div className="flex justify-between"><span className="text-brand-600">Flights</span><span className="font-semibold">€{p.avg_flight_price.toFixed(0)}</span></div>
                       <div className="flex justify-between"><span className="text-brand-600">Accommodation/night</span><span className="font-semibold">€{p.avg_accommodation_price.toFixed(0)}</span></div>
                       <div className="flex justify-between"><span className="text-brand-600">Weather score</span><span className="font-semibold">{p.weather_score.toFixed(0)}%</span></div>
-                      <div className="flex justify-between pt-2 border-t border-brand-100"><span className="font-medium text-brand-800">Estimated total</span><span className="font-bold text-brand-900">€{p.estimated_total.toFixed(0)}</span></div>
+                      <div className="flex justify-between pt-2 border-t border-brand-100"><span className="font-medium text-brand-800">Total price</span><span className="font-bold text-brand-900">€{p.estimated_total.toFixed(0)}</span></div>
                     </div>
                   </div>
                 ))}

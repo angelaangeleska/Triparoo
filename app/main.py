@@ -18,8 +18,9 @@ async def lifespan(app: FastAPI):
     app.state.airport_catalog_size = len(catalog.airports)
     app.state.flight_provider = flight_provider_label()
     app.state.flight_provider_ready = bool(
-        settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET
-    ) or app.state.flight_provider == "global-estimate"
+        settings.SERPAPI_API_KEY
+        or (settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET)
+    )
     yield
 
 
@@ -55,11 +56,13 @@ def create_app() -> FastAPI:
         ready = getattr(request.app.state, "flight_provider_ready", False)
         provider = getattr(request.app.state, "flight_provider", "unknown")
         hint = None
-        if provider == "amadeus" and not ready:
+        if not ready:
             hint = (
-                "Add AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET to .env — "
-                "free test keys at https://developers.amadeus.com"
+                "Add SERPAPI_API_KEY (recommended) or AMADEUS_CLIENT_ID/AMADEUS_CLIENT_SECRET to .env — "
+                "SerpAPI: https://serpapi.com/manage-api-key | Amadeus: https://developers.amadeus.com"
             )
+        elif provider == "amadeus" and not settings.AMADEUS_CLIENT_ID:
+            hint = "Amadeus selected but credentials missing"
         return {
             "status": "ok",
             "app": settings.APP_NAME,

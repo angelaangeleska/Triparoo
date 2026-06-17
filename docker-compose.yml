@@ -24,6 +24,11 @@ services:
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "true"
       CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      FLIGHT_PROVIDER: ${FLIGHT_PROVIDER:-auto}
+      ACCOMMODATION_PROVIDER: ${ACCOMMODATION_PROVIDER:-serpapi}
+      AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID:-}
+      AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

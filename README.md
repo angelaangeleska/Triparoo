@@ -10,7 +10,7 @@ An intelligent travel planning platform for families, built with **FastAPI**, **
 - **AI itinerary generation** — day-by-day travel plans tailored to your family
 - **Child-friendly activity recommendations** — matched by age, interests, and gender
 - **Budget optimization** — compare alternatives for dates, accommodations, and destinations
-- **Flight & accommodation search** — provider abstraction with mock implementations
+- **Flight & accommodation search** — live prices via SerpAPI (Google Flights & Hotels) and Amadeus
 - **Authentication** — JWT access/refresh tokens, register/login, Google OAuth
 
 ## Architecture
