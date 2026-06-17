@@ -28,6 +28,7 @@ import type {
   TripMember,
 } from '../types'
 import HotelCard from '../components/planner/HotelCard'
+import OriginLocationInput from '../components/planner/OriginLocationInput'
 import { CITY_IMAGES, DEFAULT_CITY_IMAGE, INTEREST_OPTIONS, MONTHS } from '../types'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
@@ -39,7 +40,12 @@ export default function DestinationDetailPage() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const tripState = location.state as { startDate?: string; endDate?: string; partySize?: number } | null
+  const tripState = location.state as {
+    startDate?: string
+    endDate?: string
+    partySize?: number
+    originLocation?: string
+  } | null
 
   const [destination, setDestination] = useState<Destination | null>(null)
   const [attractions, setAttractions] = useState<Attraction[]>([])
@@ -59,9 +65,16 @@ export default function DestinationDetailPage() {
   const [childAge, setChildAge] = useState(11)
   const [childInterests, setChildInterests] = useState<string[]>(['disney'])
   const [childActivities, setChildActivities] = useState<ChildActivity[]>([])
+  const [childActivitiesSearched, setChildActivitiesSearched] = useState(false)
+  const [childActivitiesLoading, setChildActivitiesLoading] = useState(false)
 
   // Cheapest dates
   const [cheapestPeriods, setCheapestPeriods] = useState<CheapestPeriod[]>([])
+  const [datesOrigin, setDatesOrigin] = useState(tripState?.originLocation || '')
+  const [datesPartySize, setDatesPartySize] = useState(tripState?.partySize ?? 3)
+  const [datesOriginMessage, setDatesOriginMessage] = useState('')
+  const [datesLoading, setDatesLoading] = useState(false)
+  const [datesSearched, setDatesSearched] = useState(false)
 
   // Budget
   const [budgetResult, setBudgetResult] = useState<{
@@ -149,7 +162,10 @@ export default function DestinationDetailPage() {
 
   const loadChildActivities = async () => {
     if (!requireAuth()) return
+    if (childInterests.length === 0) return
     setError('')
+    setChildActivitiesLoading(true)
+    setChildActivitiesSearched(true)
     try {
       const res = await api.childActivities({
         destination_id: destId,
@@ -158,18 +174,35 @@ export default function DestinationDetailPage() {
       })
       setChildActivities(res.activities)
     } catch (err) {
+      setChildActivities([])
       setError(err instanceof ApiError ? err.message : 'Failed to load activities')
+    } finally {
+      setChildActivitiesLoading(false)
     }
   }
 
   const loadCheapestDates = async () => {
     if (!requireAuth()) return
+    if (!datesOrigin.trim()) {
+      setError('Enter your departure city or country to see flight prices.')
+      return
+    }
     setError('')
+    setDatesLoading(true)
+    setDatesSearched(true)
     try {
-      const res = await api.cheapestDates({ destination_id: destId, party_size: 3 })
+      const res = await api.cheapestDates({
+        destination_id: destId,
+        party_size: datesPartySize,
+        origin_location: datesOrigin.trim(),
+      })
       setCheapestPeriods(res.cheapest_periods)
+      setDatesOriginMessage(res.origin_message || '')
     } catch (err) {
+      setCheapestPeriods([])
       setError(err instanceof ApiError ? err.message : 'Failed to load dates')
+    } finally {
+      setDatesLoading(false)
     }
   }
 
@@ -179,11 +212,11 @@ export default function DestinationDetailPage() {
     try {
       const res = await api.budgetOptimize({
         destination_id: destId,
-        origin_airport_id: 1,
+        origin_location: datesOrigin.trim() || tripState?.originLocation || undefined,
         members: defaultMembers,
         budget: 1500,
-        start_date: '2025-08-01',
-        end_date: '2025-08-08',
+        start_date: tripState?.startDate || localDateOffset(30),
+        end_date: tripState?.endDate || localDateOffset(37),
       })
       setBudgetResult(res)
     } catch (err) {
@@ -247,7 +280,7 @@ export default function DestinationDetailPage() {
                 key={key}
                 onClick={() => {
                   setTab(key)
-                  if (key === 'dates' && cheapestPeriods.length === 0) loadCheapestDates()
+                  if (key === 'dates' && !datesSearched && datesOrigin.trim()) loadCheapestDates()
                   if (key === 'budget' && !budgetResult) loadBudget()
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
@@ -396,24 +429,44 @@ export default function DestinationDetailPage() {
                   className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white" />
               </div>
               <div className="mb-4">
-                <label className="text-xs text-brand-500 font-medium mb-2 block">Interests</label>
+                <label className="text-xs text-brand-500 font-medium mb-2 block">
+                  Interests {childInterests.length > 0 && <span className="text-brand-400">({childInterests.length} selected)</span>}
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {INTEREST_OPTIONS.map((interest) => (
-                    <button key={interest} onClick={() => setChildInterests(
-                      childInterests.includes(interest) ? childInterests.filter(x => x !== interest) : [...childInterests, interest]
-                    )} className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    <button key={interest} onClick={() => {
+                      setChildActivities([])
+                      setChildActivitiesSearched(false)
+                      setChildInterests(
+                        childInterests.includes(interest)
+                          ? childInterests.filter(x => x !== interest)
+                          : [...childInterests, interest]
+                      )
+                    }} className={`px-3 py-1 rounded-full text-xs font-medium ${
                       childInterests.includes(interest) ? 'bg-brand-500 text-white' : 'bg-brand-100 text-brand-700'
                     }`}>
                       {interest.replace('_', ' ')}
                     </button>
                   ))}
                 </div>
+                {childInterests.length === 0 && (
+                  <p className="text-xs text-brand-500 mt-2">Select at least one interest to filter activities.</p>
+                )}
               </div>
-              <button onClick={loadChildActivities}
-                className="w-full py-3 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600">
-                Find matching activities
+              <button onClick={loadChildActivities} disabled={childInterests.length === 0 || childActivitiesLoading}
+                className="w-full py-3 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                {childActivitiesLoading ? 'Searching...' : 'Find matching activities'}
               </button>
             </div>
+
+            {childActivitiesLoading && <LoadingSpinner message="Finding activities..." />}
+
+            {childActivitiesSearched && !childActivitiesLoading && childActivities.length === 0 && (
+              <p className="text-sm text-brand-600 text-center py-8 glass rounded-xl">
+                No activities match {childInterests.map((i) => i.replace('_', ' ')).join(', ')} for this destination.
+                Try another interest or age.
+              </p>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-4">
               {childActivities.map((a) => (
@@ -438,9 +491,44 @@ export default function DestinationDetailPage() {
         {tab === 'dates' && (
           <FadeIn>
             <h2 className="font-display text-2xl font-bold text-brand-900 mb-6">Best times to visit</h2>
-            {cheapestPeriods.length === 0 ? (
-              <LoadingSpinner message="Analyzing seasonal prices..." />
-            ) : (
+
+            <div className="glass rounded-2xl p-6 mb-8 max-w-lg space-y-4">
+              <div>
+                <label className="text-sm text-brand-600 mb-2 block">Departing from</label>
+                <OriginLocationInput value={datesOrigin} onChange={setDatesOrigin} />
+              </div>
+              <div>
+                <label className="text-sm text-brand-600 mb-1 block">Travelers</label>
+                <input
+                  type="number"
+                  value={datesPartySize}
+                  onChange={(e) => setDatesPartySize(Math.max(1, parseInt(e.target.value) || 1))}
+                  min={1}
+                  max={9}
+                  className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white"
+                />
+              </div>
+              <button
+                onClick={loadCheapestDates}
+                disabled={datesLoading || !datesOrigin.trim()}
+                className="w-full py-3 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {datesLoading ? 'Loading live prices...' : 'Compare seasons'}
+              </button>
+              {!datesOrigin.trim() && (
+                <p className="text-xs text-brand-500">Flight prices need your departure city or country.</p>
+              )}
+            </div>
+
+            {datesOriginMessage && (
+              <p className="text-sm text-brand-600 mb-4 px-4 py-3 rounded-xl bg-brand-50 border border-brand-100">
+                {datesOriginMessage}
+              </p>
+            )}
+
+            {datesLoading && <LoadingSpinner message="Fetching live flight and hotel prices..." />}
+
+            {datesSearched && !datesLoading && cheapestPeriods.length > 0 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 {cheapestPeriods.map((p, i) => (
                   <div key={p.season} className={`glass rounded-2xl p-6 ${i === 0 ? 'ring-2 ring-brand-400' : ''}`}>
@@ -450,7 +538,12 @@ export default function DestinationDetailPage() {
                       {MONTHS[p.month_start - 1]} – {MONTHS[p.month_end - 1]}
                     </p>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-brand-600">Flights</span><span className="font-semibold">€{p.avg_flight_price.toFixed(0)}</span></div>
+                      <div className="flex justify-between">
+                        <span className="text-brand-600">Flights (party)</span>
+                        <span className="font-semibold">
+                          {p.avg_flight_price > 0 ? `€${p.avg_flight_price.toFixed(0)}` : '—'}
+                        </span>
+                      </div>
                       <div className="flex justify-between"><span className="text-brand-600">Accommodation/night</span><span className="font-semibold">€{p.avg_accommodation_price.toFixed(0)}</span></div>
                       <div className="flex justify-between"><span className="text-brand-600">Weather score</span><span className="font-semibold">{p.weather_score.toFixed(0)}%</span></div>
                       <div className="flex justify-between pt-2 border-t border-brand-100"><span className="font-medium text-brand-800">Total price</span><span className="font-bold text-brand-900">€{p.estimated_total.toFixed(0)}</span></div>
@@ -458,6 +551,12 @@ export default function DestinationDetailPage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {datesSearched && !datesLoading && cheapestPeriods.length === 0 && (
+              <p className="text-sm text-brand-600 text-center py-8 glass rounded-xl">
+                Could not load seasonal prices. Check your departure city and try again.
+              </p>
             )}
           </FadeIn>
         )}

@@ -186,6 +186,7 @@ class CheapestDatesResponse(BaseModel):
     city: str
     country: str
     cheapest_periods: list[CheapestPeriod]
+    origin_message: Optional[str] = None
 
 
 class ItineraryRequest(BaseModel):

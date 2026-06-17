@@ -95,6 +95,11 @@ class CostEstimatorService:
         origin_iatas, origin_ids, origin_message = await self.origin_resolver.resolve_airports(
             origin_location, origin_airport_id
         )
+        if not origin_iatas and not origin_message:
+            if origin_location or origin_airport_id:
+                origin_message = "Could not find airports for that departure location."
+            else:
+                origin_message = "Add a departure city or country to get flight prices."
 
         if origin_iatas and destination.city and destination.city.airports:
             dest_airport = destination.city.airports[0]
@@ -126,6 +131,10 @@ class CostEstimatorService:
                 if best_out:
                     flight_cost = self._trip_flight_cost(best_out, best_return)
                     flight_offer_data = build_flight_summary(best_out, party_size, best_return, best_alts)
+                elif origin_iatas and not same_origin:
+                    origin_message = (
+                        origin_message or "No live flights found for these dates — check SerpAPI key or try other dates."
+                    )
 
         accommodation_cost = 0.0
         acc_name = ""

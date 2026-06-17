@@ -13,9 +13,10 @@ interface Props {
   startDate?: string
   endDate?: string
   partySize?: number
+  originLocation?: string
 }
 
-export default function RecommendationCard({ rec, rank, startDate, endDate, partySize }: Props) {
+export default function RecommendationCard({ rec, rank, startDate, endDate, partySize, originLocation }: Props) {
   const image = CITY_IMAGES[rec.city] || DEFAULT_CITY_IMAGE
   const flight = normalizeFlightSummary(rec.flight)
 
@@ -103,7 +104,7 @@ export default function RecommendationCard({ rec, rank, startDate, endDate, part
 
           <Link
             to={`/destinations/${rec.destination_id}`}
-            state={{ startDate, endDate, partySize }}
+            state={{ startDate, endDate, partySize, originLocation }}
             className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors group/link"
           >
             Explore {rec.city}

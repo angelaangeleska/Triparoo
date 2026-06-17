@@ -13,6 +13,7 @@ from app.schemas.trip_planner import (
     ItineraryRequest,
     ItineraryResponse,
 )
+from app.services.activity_matching import attraction_matches_interest, attraction_matches_interests
 from app.services.cost_estimator import CostEstimatorService
 
 
@@ -26,10 +27,13 @@ class ChildActivityService:
             raise NotFoundError("Destination not found")
 
         results = []
+        interest_set = {i.lower().strip() for i in request.interests if i and i.strip()}
         for att in dest.attractions or []:
             if not att.family_friendly:
                 continue
             if not (att.min_age <= request.age <= att.max_age):
+                continue
+            if interest_set and not attraction_matches_interests(att, request.interests):
                 continue
 
             score = 60.0
@@ -43,10 +47,12 @@ class ChildActivityService:
             if request.age >= 8 and "museum" in att.category.lower():
                 score += 10
                 reasons.append("Educational and interactive")
-            interest_set = {i.lower() for i in request.interests}
-            if any(t in interest_set for t in (att.tags or [])):
-                score += 15
-                reasons.append("Matches stated interests")
+            if interest_set:
+                matched = [i for i in request.interests if attraction_matches_interest(att, i)]
+                if matched:
+                    score += 15 + min(len(matched) * 5, 15)
+                    labels = ", ".join(m.replace("_", " ") for m in matched)
+                    reasons.append(f"Matches: {labels}")
 
             results.append(
                 ChildActivityResult(

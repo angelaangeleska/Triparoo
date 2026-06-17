@@ -38,6 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser()
   }, [loadUser])
 
+  useEffect(() => {
+    const onSessionExpired = () => setUser(null)
+    window.addEventListener('auth:session-expired', onSessionExpired)
+    return () => window.removeEventListener('auth:session-expired', onSessionExpired)
+  }, [])
+
   const login = async (email: string, password: string) => {
     const tokens = await api.login(email, password)
     localStorage.setItem('access_token', tokens.access_token)

@@ -210,6 +210,7 @@ class TripPlannerService:
             raise NotFoundError("Destination not found")
 
         periods = []
+        origin_message: str | None = None
         for season in dest.seasons or []:
             mid_month = season.month_start
             today = date.today()
@@ -226,6 +227,8 @@ class TripPlannerService:
                 origin_location=request.origin_location,
                 origin_airport_id=request.origin_airport_id,
             )
+            if estimate.get("origin_message") and not origin_message:
+                origin_message = estimate["origin_message"]
             avg_acc = estimate["accommodation"] / max(estimate["nights"], 1)
             periods.append(
                 CheapestPeriod(
@@ -244,4 +247,5 @@ class TripPlannerService:
             city=dest.city.name if dest.city else "",
             country=dest.city.country.name if dest.city and dest.city.country else "",
             cheapest_periods=periods,
+            origin_message=origin_message,
         )
