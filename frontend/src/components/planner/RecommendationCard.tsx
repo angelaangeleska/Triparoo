@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Euro, MapPin, Star, TrendingUp } from 'lucide-react'
 import type { DestinationRecommendation } from '../../types'
-import { CITY_IMAGES, DEFAULT_CITY_IMAGE } from '../../types'
 import { normalizeFlightSummary } from '../../utils/flight'
+import CityImage from '../ui/CityImage'
 import FlightTicketCard from './FlightTicketCard'
 import HotelCard from './HotelCard'
 import ScoreBreakdownChart from './ScoreBreakdownChart'
@@ -17,15 +17,14 @@ interface Props {
 }
 
 export default function RecommendationCard({ rec, rank, startDate, endDate, partySize, originLocation }: Props) {
-  const image = CITY_IMAGES[rec.city] || DEFAULT_CITY_IMAGE
   const flight = normalizeFlightSummary(rec.flight)
 
   return (
     <article className="glass rounded-2xl overflow-hidden shadow-card hover:shadow-glow transition-all duration-300 group">
       <div className="grid md:grid-cols-5 gap-0">
         <div className="md:col-span-2 relative h-48 md:h-auto min-h-[200px] overflow-hidden">
-          <img
-            src={image}
+          <CityImage
+            city={rec.city}
             alt={rec.city}
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />

@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
         hint = None
         if not ready:
             hint = (
-                "Add SERPAPI_API_KEY (recommended) or AMADEUS_CLIENT_ID/AMADEUS_CLIENT_SECRET to .env — "
+                "Add SERPAPI_API_KEY (recommended) or AMADEUS_CLIENT_ID/AMADEUS_CLIENT_SECRET to ..env — "
                 "SerpAPI: https://serpapi.com/manage-api-key | Amadeus: https://developers.amadeus.com"
             )
         elif provider == "amadeus" and not settings.AMADEUS_CLIENT_ID:

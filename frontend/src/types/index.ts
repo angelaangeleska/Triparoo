@@ -230,15 +230,4 @@ export const INTEREST_OPTIONS = [
   'disney', 'science', 'museum', 'art', 'outdoor', 'beach', 'history', 'animals', 'theme_park',
 ]
 
-export const CITY_IMAGES: Record<string, string> = {
-  Paris: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80',
-  London: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&q=80',
-  Rome: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800&q=80',
-  Barcelona: 'https://images.unsplash.com/photo-1583422409516-2895f3051a8?w=800&q=80',
-  Vienna: 'https://images.unsplash.com/photo-1601918774946-25832a4a0d36?w=800&q=80',
-  Prague: 'https://images.unsplash.com/photo-1541849546-216549ae216d?w=800&q=80',
-  Amsterdam: 'https://images.unsplash.com/photo-1534351590666-13e3e96fd619?w=800&q=80',
-}
-
-export const DEFAULT_CITY_IMAGE =
-  'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80'
+export { DEFAULT_CITY_IMAGE, getCityImage, HERO_IMAGE } from '../utils/cityImages'

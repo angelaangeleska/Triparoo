@@ -1,23 +1,21 @@
 import { Link } from 'react-router-dom'
 import { Heart, MapPin, Star } from 'lucide-react'
 import type { Destination } from '../../types'
-import { CITY_IMAGES, DEFAULT_CITY_IMAGE } from '../../types'
+import CityImage from '../ui/CityImage'
 
 interface Props {
   destination: Destination
 }
 
 export default function DestinationCard({ destination }: Props) {
-  const image = CITY_IMAGES[destination.city || ''] || DEFAULT_CITY_IMAGE
-
   return (
     <Link
       to={`/destinations/${destination.id}`}
       className="group block glass rounded-2xl overflow-hidden shadow-soft hover:shadow-card transition-all duration-300 hover:-translate-y-1"
     >
       <div className="relative h-52 overflow-hidden">
-        <img
-          src={image}
+        <CityImage
+          city={destination.city || ''}
           alt={destination.city}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />

@@ -25,6 +25,38 @@ _PRIORITY_COUNTRIES = {
     "ae", "eg", "ma", "tn", "th", "jp", "sg", "mx", "br", "au", "nz",
 }
 
+# Local vs English city names that refer to the same place.
+_CITY_ALIAS_GROUPS: tuple[frozenset[str], ...] = (
+    frozenset({"rome", "roma"}),
+    frozenset({"milan", "milano"}),
+    frozenset({"florence", "firenze"}),
+    frozenset({"naples", "napoli"}),
+    frozenset({"venice", "venezia"}),
+    frozenset({"munich", "munchen", "muenchen"}),
+    frozenset({"cologne", "koln", "koeln"}),
+    frozenset({"vienna", "wien"}),
+    frozenset({"prague", "praha"}),
+    frozenset({"warsaw", "warszawa"}),
+    frozenset({"lisbon", "lisboa"}),
+    frozenset({"athens", "athina"}),
+    frozenset({"brussels", "bruxelles"}),
+    frozenset({"copenhagen", "kobenhavn", "københavn"}),
+)
+
+
+def _city_equivalent_keys(city: str) -> set[str]:
+    key = city.lower()
+    keys = {key}
+    for group in _CITY_ALIAS_GROUPS:
+        if key in group:
+            keys.update(group)
+    return keys
+
+
+def cities_equivalent(city_a: str, city_b: str) -> bool:
+    """True when two city names refer to the same place (e.g. Rome / Roma)."""
+    return bool(_city_equivalent_keys(city_a) & _city_equivalent_keys(city_b))
+
 
 def _prominence(name: str) -> int:
     """0 = international, 1 = regular, 2 = minor. Lower is better."""
@@ -39,6 +71,27 @@ def _prominence(name: str) -> int:
 def _country_priority(country_code: str) -> int:
     """0 = priority country, 1 = other. Lower is better."""
     return 0 if country_code.lower() in _PRIORITY_COUNTRIES else 1
+
+
+def _parse_city_country(query: str) -> tuple[str, str | None]:
+    """Split 'Rome, Italy' into ('Rome', 'Italy'). Returns (query, None) if no country part."""
+    if "," not in query:
+        return query, None
+    city_part, country_part = (p.strip() for p in query.split(",", 1))
+    if city_part and country_part:
+        return city_part, country_part
+    return query, None
+
+
+def _matches_country(airport: "CatalogAirport", country_query: str) -> bool:
+    cq = country_query.lower()
+    if airport.country_code.lower() == cq:
+        return True
+    country_lower = airport.country.lower()
+    if country_lower == cq or country_lower.startswith(cq):
+        return True
+    # e.g. "united states" → "United States of America", "usa" → US code handled above
+    return cq in country_lower
 
 
 def ensure_catalog_file() -> None:
@@ -89,10 +142,18 @@ class AirportCatalog:
         by_city: dict[str, list[CatalogAirport]] = {}
         for a in airports:
             if a.city:
-                by_city.setdefault(a.city.lower(), []).append(a)
-        # sort each city bucket: priority country first, then by prominence, then name
-        for bucket in by_city.values():
-            bucket.sort(key=lambda a: (_country_priority(a.country_code), _prominence(a.name), a.name))
+                for key in _city_equivalent_keys(a.city):
+                    by_city.setdefault(key, []).append(a)
+        # dedupe and sort each city bucket: priority country first, then by prominence, then name
+        for key, bucket in by_city.items():
+            seen: set[str] = set()
+            deduped: list[CatalogAirport] = []
+            for ap in bucket:
+                if ap.iata not in seen:
+                    seen.add(ap.iata)
+                    deduped.append(ap)
+            deduped.sort(key=lambda a: (_country_priority(a.country_code), _prominence(a.name), a.name))
+            by_city[key] = deduped
 
         by_country: dict[str, list[CatalogAirport]] = {}
         for a in airports:
@@ -115,9 +176,10 @@ class AirportCatalog:
         Match priority:
           1. Exact IATA code
           2. Exact country name / ISO code
-          3. Exact city name  ← O(1) dict lookup, sorted by prominence
-          4. City name starts-with (prefix)
-          5. Geo centroid fallback
+          3. City + country (e.g. "Rome, Italy")
+          4. Exact city name  ← O(1) dict lookup, sorted by prominence
+          5. City name starts-with (prefix)
+          6. Geo centroid fallback
         Airport *names* are intentionally never searched to avoid false
         positives (e.g. 'Madrid' matching 'de la Madrid Airport' in Mexico).
         """
@@ -125,26 +187,37 @@ class AirportCatalog:
         if len(q) < 2:
             return []
 
-        q_lower = q.lower()
-        q_upper = q.upper()
+        city_part, country_part = _parse_city_country(q)
+        q_lower = city_part.lower()
+        q_upper = city_part.upper()
 
         # 1. Exact IATA code
-        if len(q_upper) == 3 and q_upper in self.by_iata:
+        if not country_part and len(q_upper) == 3 and q_upper in self.by_iata:
             ap = self.by_iata[q_upper]
             return [(ap, "iata", None, None)]
 
-        # 2. Exact country match (name or ISO code)
-        country_bucket = self.by_country.get(q_lower)
-        if country_bucket:
-            ranked = sorted(country_bucket, key=lambda a: (_prominence(a.name), a.city, a.name))
-            return [(ap, "country", None, f"Airport in {ap.country}") for ap in ranked[:limit]]
+        # 2. Exact country match (name or ISO code) — only when no city part specified
+        if not country_part:
+            country_bucket = self.by_country.get(q_lower)
+            if country_bucket:
+                ranked = sorted(country_bucket, key=lambda a: (_prominence(a.name), a.city, a.name))
+                return [(ap, "country", None, f"Airport in {ap.country}") for ap in ranked[:limit]]
 
-        # 3. Exact city name match — single dict lookup, pre-sorted by prominence
+        # 3. City + country (e.g. "Rome, Italy" or "Rome, US")
+        if country_part:
+            city_bucket = self.by_city.get(q_lower)
+            if city_bucket:
+                filtered = [ap for ap in city_bucket if _matches_country(ap, country_part)]
+                if filtered:
+                    return [(ap, "direct", None, None) for ap in filtered[:limit]]
+            return []
+
+        # 4. Exact city name match — single dict lookup, pre-sorted by prominence
         city_bucket = self.by_city.get(q_lower)
         if city_bucket:
             return [(ap, "direct", None, None) for ap in city_bucket[:limit]]
 
-        # 4. City prefix match (e.g. "new y" → "New York", "amst" → "Amsterdam")
+        # 5. City prefix match (e.g. "new y" → "New York", "amst" → "Amsterdam")
         prefix_hits: list[CatalogAirport] = []
         seen: set[str] = set()
         for city_key, bucket in self.by_city.items():
@@ -157,7 +230,7 @@ class AirportCatalog:
             prefix_hits.sort(key=lambda a: (len(a.city), _prominence(a.name), a.name))
             return [(ap, "direct", None, None) for ap in prefix_hits[:limit]]
 
-        # 5. Geo centroid: average position of all cities containing the query
+        # 6. Geo centroid: average position of all cities containing the query
         #    as a substring (last resort for partial / misspelled input)
         city_matches = [ap for ap in self.airports if ap.city and q_lower in ap.city.lower()]
         if city_matches:

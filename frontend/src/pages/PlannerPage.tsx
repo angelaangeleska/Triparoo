@@ -250,7 +250,7 @@ export default function PlannerPage() {
             <div className="sm:col-span-2">
               <label className="flex items-center gap-2 text-sm font-medium text-brand-700 mb-2">
                 <Plane className="w-4 h-4" />
-                Departing from (city or country)
+                Departing from (city, country, or city + country)
               </label>
               <OriginLocationInput
                 value={originLocation}

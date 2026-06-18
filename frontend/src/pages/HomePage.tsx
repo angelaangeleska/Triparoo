@@ -12,6 +12,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import FadeIn from '../components/ui/FadeIn'
+import { HERO_IMAGE } from '../utils/cityImages'
 
 const features = [
   {
@@ -55,7 +56,7 @@ export default function HomePage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1526778547705-9f6c5f0422c8?w=1920&q=80')`,
+            backgroundImage: `url('${HERO_IMAGE}')`,
           }}
         />
         <div className="absolute inset-0 bg-hero-gradient" />
