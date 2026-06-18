@@ -48,7 +48,43 @@ function getToken(): string | null {
   return localStorage.getItem('access_token')
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+function clearSession() {
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  window.dispatchEvent(new CustomEvent('auth:session-expired'))
+}
+
+async function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) return false
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+    if (!res.ok) return false
+    const data = (await res.json()) as { access_token: string; refresh_token: string }
+    localStorage.setItem('access_token', data.access_token)
+    localStorage.setItem('refresh_token', data.refresh_token)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function friendlyAuthMessage(status: number, detail: string): string {
+  if (status === 401) {
+    if (detail.toLowerCase().includes('invalid token') || detail.toLowerCase().includes('not authenticated')) {
+      return 'Your session expired. Please sign in again.'
+    }
+    return 'Please sign in to continue.'
+  }
+  return detail
+}
+
+async function request<T>(path: string, options: RequestInit = {}, allowRefresh = true): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -56,11 +92,28 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  } catch {
+    throw new ApiError('Cannot reach the API. Is the backend running on port 8000?', 0)
+  }
+
+  if (res.status === 401 && allowRefresh && !path.startsWith('/auth/')) {
+    const refreshed = await refreshAccessToken()
+    if (refreshed) {
+      return request<T>(path, options, false)
+    }
+    clearSession()
+    const body = await res.json().catch(() => ({ detail: 'Not authenticated' }))
+    const detail = formatApiError(body.detail ?? body)
+    throw new ApiError(friendlyAuthMessage(401, detail), 401)
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new ApiError(formatApiError(body.detail ?? body), res.status)
+    const detail = formatApiError(body.detail ?? body)
+    throw new ApiError(friendlyAuthMessage(res.status, detail), res.status)
   }
 
   if (res.status === 204) return undefined as T
@@ -108,9 +161,9 @@ export const api = {
   accommodations: (destinationId?: number) =>
     request<Accommodation[]>(`/accommodations${destinationId ? `?destination_id=${destinationId}` : ''}`),
 
-  searchHotels: (city: string, checkIn: string, checkOut: string, adults = 2, children = 0) =>
+  searchHotels: (city: string, checkIn: string, checkOut: string, adults = 2, children = 0, country = '') =>
     request<AccommodationSummary[]>(
-      `/trip-planner/hotels?city=${encodeURIComponent(city)}&check_in=${checkIn}&check_out=${checkOut}&adults=${adults}&children=${children}`
+      `/trip-planner/hotels?city=${encodeURIComponent(city)}&check_in=${checkIn}&check_out=${checkOut}&adults=${adults}&children=${children}${country ? `&country=${encodeURIComponent(country)}` : ''}`
     ),
 
   recommend: (data: {
@@ -139,12 +192,18 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  cheapestDates: (data: { destination_id: number; origin_airport_id?: number; party_size: number }) =>
+  cheapestDates: (data: {
+    destination_id: number
+    origin_location?: string
+    origin_airport_id?: number
+    party_size: number
+  }) =>
     request<{
       destination_id: number
       city: string
       country: string
       cheapest_periods: CheapestPeriod[]
+      origin_message?: string
     }>('/trip-planner/cheapest-dates', { method: 'POST', body: JSON.stringify(data) }),
 
   itinerary: (data: {
@@ -175,7 +234,8 @@ export const api = {
 
   budgetOptimize: (data: {
     destination_id: number
-    origin_airport_id: number
+    origin_location?: string
+    origin_airport_id?: number
     members: TripMember[]
     budget: number
     start_date: string

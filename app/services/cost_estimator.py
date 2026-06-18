@@ -2,6 +2,9 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.integrations.accommodations.base import AccommodationSearchCriteria
+from app.integrations.accommodations.factory import get_accommodation_provider
+from app.integrations.accommodations.serialize import accommodation_to_dict
 from app.integrations.flights.base import FlightOffer, FlightSearchCriteria
 from app.integrations.flights.factory import get_flight_provider
 from app.integrations.flights.serialize import build_flight_summary
@@ -13,6 +16,7 @@ class CostEstimatorService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.flight_provider = get_flight_provider(session)
+        self.accommodation_provider = get_accommodation_provider()
         self.origin_resolver = OriginResolverService(session)
 
     async def _best_round_trip(
@@ -91,6 +95,11 @@ class CostEstimatorService:
         origin_iatas, origin_ids, origin_message = await self.origin_resolver.resolve_airports(
             origin_location, origin_airport_id
         )
+        if not origin_iatas and not origin_message:
+            if origin_location or origin_airport_id:
+                origin_message = "Could not find airports for that departure location."
+            else:
+                origin_message = "Add a departure city or country to get flight prices."
 
         if origin_iatas and destination.city and destination.city.airports:
             dest_airport = destination.city.airports[0]
@@ -122,11 +131,31 @@ class CostEstimatorService:
                 if best_out:
                     flight_cost = self._trip_flight_cost(best_out, best_return)
                     flight_offer_data = build_flight_summary(best_out, party_size, best_return, best_alts)
+                elif origin_iatas and not same_origin:
+                    origin_message = (
+                        origin_message or "No live flights found for these dates — check SerpAPI key or try other dates."
+                    )
 
-        # Accommodation cost is estimated here; real hotel search is a separate /hotels endpoint
-        accommodation_cost = round(100.0 * nights * party_size * 0.5, 2)
-        acc_name = "Hotel (estimated)"
+        accommodation_cost = 0.0
+        acc_name = ""
         acc_data = None
+        city_name = destination.city.name if destination.city else ""
+        country_name = destination.city.country.name if destination.city and destination.city.country else ""
+        if city_name:
+            hotels = await self.accommodation_provider.search(
+                AccommodationSearchCriteria(
+                    city=city_name,
+                    check_in=start_date,
+                    check_out=end_date,
+                    adults=max(party_size, 1),
+                    country=country_name,
+                )
+            )
+            if hotels:
+                best_hotel = hotels[0]
+                accommodation_cost = best_hotel.total_price
+                acc_name = best_hotel.name
+                acc_data = accommodation_to_dict(best_hotel)
 
         activity_cost = 0.0
         if destination.attractions:

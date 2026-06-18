@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
-    RECOMMENDATION_PROVIDER: str = "mock"
+    RECOMMENDATION_PROVIDER: str = "rule"
     FLIGHT_PROVIDER: str = "serpapi"
     ACCOMMODATION_PROVIDER: str = "serpapi"
 

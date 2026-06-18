@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+import re
+from datetime import date, datetime, timedelta
 
 import httpx
 
@@ -48,13 +49,23 @@ class SerpApiFlightProvider:
             first = legs[0]
             last = legs[-1]
 
-            # Departure / arrival datetimes
             dep_str = first.get("departure_airport", {}).get("time", "")
             arr_str = last.get("arrival_airport", {}).get("time", "")
-            dep_dt = _parse_google_datetime(dep_str)
-            arr_dt = _parse_google_datetime(arr_str)
-            if dep_dt is None or arr_dt is None:
+            dep_dt = _parse_google_datetime(dep_str, criteria.departure_date)
+            arr_dt = _parse_google_datetime(
+                arr_str,
+                ref_date=dep_dt.date() if dep_dt else criteria.departure_date,
+            )
+
+            duration_minutes: int = int(group.get("total_duration") or 0)
+            if duration_minutes == 0:
+                duration_minutes = sum(int(leg.get("duration") or 0) for leg in legs)
+
+            if dep_dt is None:
                 return None
+            arr_dt = _resolve_arrival(dep_dt, arr_dt, duration_minutes)
+            if duration_minutes == 0:
+                duration_minutes = max(int((arr_dt - dep_dt).total_seconds() / 60), 1)
 
             origin_iata = first.get("departure_airport", {}).get("id", criteria.origin_iata)
             dest_iata = last.get("arrival_airport", {}).get("id", criteria.destination_iata)
@@ -62,18 +73,12 @@ class SerpApiFlightProvider:
             dest_name, dest_city = self._airport_meta(dest_iata)
 
             airline = first.get("airline", "Unknown Airline")
-            airline_code = first.get("airline_logo", "").split("/")[-1].split(".")[0].upper() or "XX"
             flight_number = first.get("flight_number", "")
-            duration_minutes: int = group.get("total_duration") or int(
-                (arr_dt - dep_dt).total_seconds() / 60
-            )
+            airline_code = _extract_airline_code(flight_number, airline, first.get("airline_logo", ""))
             stops = max(0, len(legs) - 1)
 
-            # Price — top-level price is per-person total for this itinerary group
             price_raw = group.get("price")
             total_price = float(price_raw) if price_raw else 0.0
-            # Price from SerpAPI is already per-person for the full trip
-            per_person = total_price / max(criteria.party_size, 1)
 
             cabin_class = _map_travel_class(first.get("travel_class", ""))
             extensions: list[str] = group.get("extensions", []) or []
@@ -84,7 +89,7 @@ class SerpApiFlightProvider:
                 destination_iata=dest_iata,
                 departure_date=dep_dt,
                 arrival_date=arr_dt,
-                price=round(per_person, 2),
+                price=round(total_price, 2),
                 airline=airline,
                 airline_code=airline_code[:2] if len(airline_code) >= 2 else airline_code,
                 flight_number=flight_number,
@@ -109,7 +114,7 @@ class SerpApiFlightProvider:
 
     async def search(self, criteria: FlightSearchCriteria) -> list[FlightOffer]:
         if not self.enabled:
-            logger.warning("SERPAPI_API_KEY not set — falling back to estimates")
+            logger.warning("SERPAPI_API_KEY not set — flight search unavailable")
             return []
 
         origin = criteria.origin_iata.upper()
@@ -185,16 +190,57 @@ class SerpApiFlightProvider:
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def _parse_google_datetime(value: str) -> datetime | None:
-    """Parse Google Flights datetime strings like '2024-06-15 08:30'."""
+def _parse_google_datetime(value: str, ref_date: date | None = None) -> datetime | None:
+    """Parse Google Flights datetime strings like '2024-06-15 08:30' or '10:45 AM'."""
     if not value:
         return None
-    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d %I:%M %p"):
+    value = value.strip()
+    for fmt in (
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %I:%M %p",
+        "%Y-%m-%d %I:%M%p",
+    ):
         try:
-            return datetime.strptime(value.strip(), fmt)
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    for fmt in ("%H:%M", "%I:%M %p", "%I:%M%p"):
+        try:
+            parsed = datetime.strptime(value, fmt)
+            base = ref_date or date.today()
+            return datetime.combine(base, parsed.time())
         except ValueError:
             continue
     return None
+
+
+def _resolve_arrival(
+    dep_dt: datetime,
+    arr_dt: datetime | None,
+    duration_minutes: int,
+) -> datetime:
+    if arr_dt and arr_dt > dep_dt:
+        return arr_dt
+    if duration_minutes > 0:
+        return dep_dt + timedelta(minutes=duration_minutes)
+    if arr_dt and arr_dt <= dep_dt:
+        return arr_dt + timedelta(days=1)
+    return dep_dt + timedelta(hours=1)
+
+
+def _extract_airline_code(flight_number: str, airline: str, airline_logo: str) -> str:
+    if flight_number:
+        match = re.match(r"^([A-Z0-9]{2})\b", flight_number.upper())
+        if match:
+            return match.group(1)
+    if airline_logo:
+        code = airline_logo.split("/")[-1].split(".")[0].upper()
+        if len(code) == 2 and code.isalpha():
+            return code
+    return airline[:2].upper() if airline else "XX"
 
 
 def _map_travel_class(raw: str) -> str:

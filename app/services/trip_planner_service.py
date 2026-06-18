@@ -96,7 +96,7 @@ class TripPlannerService:
             amenities=data.get("amenities") or [],
             check_in_time=data.get("check_in_time", ""),
             check_out_time=data.get("check_out_time", ""),
-            source=data.get("source", "mock"),
+            source=data.get("source", "serpapi"),
         )
 
     async def recommend(self, request: RecommendRequest) -> RecommendResponse:
@@ -210,9 +210,14 @@ class TripPlannerService:
             raise NotFoundError("Destination not found")
 
         periods = []
+        origin_message: str | None = None
         for season in dest.seasons or []:
             mid_month = season.month_start
-            sample_start = date(2025, mid_month, 10)
+            today = date.today()
+            year = today.year
+            if mid_month < today.month or (mid_month == today.month and today.day > 10):
+                year += 1
+            sample_start = date(year, mid_month, 10)
             sample_end = sample_start + timedelta(days=5)
             estimate = await self.cost_estimator.estimate_trip(
                 dest,
@@ -222,6 +227,8 @@ class TripPlannerService:
                 origin_location=request.origin_location,
                 origin_airport_id=request.origin_airport_id,
             )
+            if estimate.get("origin_message") and not origin_message:
+                origin_message = estimate["origin_message"]
             avg_acc = estimate["accommodation"] / max(estimate["nights"], 1)
             periods.append(
                 CheapestPeriod(
@@ -240,4 +247,5 @@ class TripPlannerService:
             city=dest.city.name if dest.city else "",
             country=dest.city.country.name if dest.city and dest.city.country else "",
             cheapest_periods=periods,
+            origin_message=origin_message,
         )

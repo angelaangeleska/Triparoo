@@ -70,7 +70,7 @@ class FlightLegSummary(BaseModel):
     seats_remaining: int
     baggage: str = ""
     direction: str = "outbound"
-    source: str = "global-estimate"
+    source: str = "serpapi"
     fare_note: str = ""
 
 
@@ -83,7 +83,7 @@ class FlightSummary(BaseModel):
     outbound: FlightLegSummary
     return_flight: Optional[FlightLegSummary] = None
     alternatives: list[FlightLegSummary] = []
-    source: str = "global-estimate"
+    source: str = "serpapi"
 
 
 class BookingSourceSummary(BaseModel):
@@ -110,7 +110,7 @@ class AccommodationSummary(BaseModel):
     amenities: list[str] = []
     check_in_time: str = ""
     check_out_time: str = ""
-    source: str = "mock"
+    source: str = "serpapi"
 
 
 class DestinationRecommendation(BaseModel):
@@ -186,6 +186,7 @@ class CheapestDatesResponse(BaseModel):
     city: str
     country: str
     cheapest_periods: list[CheapestPeriod]
+    origin_message: Optional[str] = None
 
 
 class ItineraryRequest(BaseModel):

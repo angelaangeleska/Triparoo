@@ -307,6 +307,7 @@ export default function PlannerPage() {
                 startDate={startDate || undefined}
                 endDate={endDate || undefined}
                 partySize={members.length}
+                originLocation={originLocation.trim() || undefined}
               />
             </FadeIn>
           ))}
