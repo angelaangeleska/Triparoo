@@ -167,7 +167,7 @@ class AmadeusFlightProvider:
 
     async def search(self, criteria: FlightSearchCriteria) -> list[FlightOffer]:
         if not self.enabled:
-            logger.warning("Amadeus credentials missing — set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET in .env")
+            logger.warning("Amadeus credentials missing — set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET in ..env")
             return []
 
         origin = criteria.origin_iata.upper()

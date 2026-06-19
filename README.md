@@ -76,7 +76,7 @@ Open http://localhost:5173 — the Vite dev server proxies `/api` to the backend
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -r requirements.txt
-cp .env.example .env          # edit DATABASE_URL if needed
+cp ...env.example ..env          # edit DATABASE_URL if needed
 alembic upgrade head
 python -m app.utils.seed
 uvicorn app.main:app --reload

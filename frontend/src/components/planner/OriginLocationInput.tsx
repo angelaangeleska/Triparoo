@@ -53,7 +53,7 @@ export default function OriginLocationInput({ value, onChange }: Props) {
             setQuery(e.target.value)
             onChange(e.target.value)
           }}
-          placeholder="City or country — e.g. Skopje, France, Macedonia"
+          placeholder="City or country — e.g. Skopje, Rome, Italy, France"
           className="w-full pl-11 pr-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400"
         />
       </div>
@@ -76,7 +76,7 @@ export default function OriginLocationInput({ value, onChange }: Props) {
 
       {!loading && !resolved && query.trim().length >= 2 && (
         <p className="text-xs text-brand-500 mt-2">
-          Type a city (Skopje, Lyon) or country (France, Macedonia). Airports are chosen automatically.
+          Type a city (Skopje, Lyon), city with country (Rome, Italy), or country (France). Airports are chosen automatically.
         </p>
       )}
     </div>
