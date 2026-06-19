@@ -32,6 +32,7 @@ services:
       ACCOMMODATION_PROVIDER: ${ACCOMMODATION_PROVIDER:-serpapi}
       AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID:-}
       AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy

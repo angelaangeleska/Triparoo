@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     AMADEUS_FALLBACK_TO_ESTIMATES: bool = False
 
     SERPAPI_API_KEY: str = ""
-
+    GROQ_API_KEY: str = ""
     # Rule engine weights (sum used for normalization)
     WEIGHT_CHILD_AGE: float = 0.20
     WEIGHT_BUDGET: float = 0.20
