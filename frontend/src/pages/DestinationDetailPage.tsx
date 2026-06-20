@@ -29,7 +29,8 @@ import type {
 } from '../types'
 import HotelCard from '../components/planner/HotelCard'
 import OriginLocationInput from '../components/planner/OriginLocationInput'
-import { CITY_IMAGES, DEFAULT_CITY_IMAGE, INTEREST_OPTIONS, MONTHS } from '../types'
+import { INTEREST_OPTIONS, MONTHS } from '../types'
+import CityImage from '../components/ui/CityImage'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
 
@@ -88,8 +89,6 @@ export default function DestinationDetailPage() {
   const [hotelsError, setHotelsError] = useState('')
 
   const destId = parseInt(id || '0')
-  const image = CITY_IMAGES[destination?.city || ''] || DEFAULT_CITY_IMAGE
-
   function localDateOffset(days: number): string {
     const d = new Date()
     d.setDate(d.getDate() + days)
@@ -246,7 +245,11 @@ export default function DestinationDetailPage() {
     <div>
       {/* Hero banner */}
       <div className="relative h-72 sm:h-96 overflow-hidden">
-        <img src={image} alt={destination.city} className="w-full h-full object-cover" />
+        <CityImage
+          city={destination.city}
+          alt={destination.city}
+          className="w-full h-full object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-brand-900/80 via-brand-900/30 to-transparent" />
         <div className="absolute bottom-0 inset-x-0 p-6 sm:p-10 max-w-7xl mx-auto">
           <Link to="/destinations" className="inline-flex items-center gap-1.5 text-white/70 hover:text-white text-sm mb-4 transition-colors">

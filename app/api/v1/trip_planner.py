@@ -90,7 +90,7 @@ async def search_hotels(
 
 @router.get("/resolve-origin", response_model=ResolvedOriginRead)
 async def resolve_origin(
-    q: str = Query(min_length=2, description="City or country name"),
+    q: str = Query(min_length=2, description="City, country, or city + country (e.g. Rome, Italy)"),
     session=Depends(get_db),
 ):
     service = OriginResolverService(session)

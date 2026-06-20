@@ -4,6 +4,7 @@ from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.airport_search import AirportSearchService
+from app.services.airport_catalog import _parse_city_country, cities_equivalent
 
 LocationType = Literal["city", "country", "airport"]
 
@@ -53,19 +54,26 @@ class OriginResolverService:
         direct = [r for r in results if r.match_type in ("direct", "iata")]
         if direct:
             best = direct[0]
-            # Group airports that belong to the same city as the top result
-            same_city = [r for r in direct if r.city_name.lower() == best.city_name.lower()]
-            if len(same_city) > 1:
-                iata_list = ", ".join(r.iata_code for r in same_city)
-                msg = f"Departing from {best.city_name} — {len(same_city)} airports ({iata_list})"
+            # Group airports in the same city and country as the top result
+            same_place = [
+                r for r in direct
+                if cities_equivalent(r.city_name, best.city_name)
+                and r.country_name.lower() == best.country_name.lower()
+            ]
+            city_part, _ = _parse_city_country(q)
+            city_label = city_part or best.city_name
+            place_label = f"{city_label}, {best.country_name}"
+            if len(same_place) > 1:
+                iata_list = ", ".join(r.iata_code for r in same_place)
+                msg = f"Departing from {place_label} — {len(same_place)} airports ({iata_list})"
             else:
-                msg = f"Departing from {best.city_name} ({best.iata_code})"
+                msg = f"Departing from {place_label} ({best.iata_code})"
             return ResolvedOrigin(
                 query=q,
                 location_type="airport",
-                display_name=f"{best.city_name}, {best.country_name}",
-                airport_iatas=[r.iata_code for r in direct],
-                airport_ids=[r.id for r in direct],
+                display_name=place_label,
+                airport_iatas=[r.iata_code for r in same_place],
+                airport_ids=[r.id for r in same_place],
                 primary_airport_id=best.id,
                 primary_iata=best.iata_code,
                 message=msg,
