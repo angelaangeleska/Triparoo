@@ -25,6 +25,7 @@ from app.schemas.trip_planner import (
 )
 from app.services.cost_estimator import CostEstimatorService
 from app.services.origin_resolver import OriginResolverService
+from app.services.groq_service import explain_recommendations_with_ai
 
 
 class TripPlannerService:
@@ -126,7 +127,27 @@ class TripPlannerService:
         for dest in destinations:
             for att in dest.attractions or []:
                 attr_map[att.id] = att
-
+        # AI explanations
+        members_list = [
+            {"age": m.age, "interests": m.interests or []}
+            for m in request.members
+        ]
+        try:
+            ai_explanations = await explain_recommendations_with_ai(
+                context_members=members_list,
+                budget=request.budget,
+                destinations=ranked,
+            )
+            print("AI EXPLANATIONS:")
+            print(ai_explanations)
+            explanation_map = {
+                e["city"].split(",")[0].strip(): e
+                for e in ai_explanations
+            }
+            print(explanation_map)
+        except Exception as e:
+            print(f"GROQ EXPLANATION ERROR: {e}")
+            explanation_map = {}
         recommendations = []
         for r in ranked:
             attractions = [
@@ -156,7 +177,7 @@ class TripPlannerService:
                     flight=self._flight_summary(r.get("flight_offer")),
                     accommodation=self._accommodation_summary(r.get("accommodation_offer")),
                     score_breakdown=ScoreBreakdown(**r["score_breakdown"]),
-                    explanation=r["explanation"],
+                    explanation=explanation_map.get(r["city"], {}).get("explanation", ""),
                     suggested_attractions=attractions,
                 )
             )
