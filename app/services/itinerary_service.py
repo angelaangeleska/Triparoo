@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +15,6 @@ from app.schemas.trip_planner import (
 )
 from app.services.activity_matching import attraction_matches_interest, attraction_matches_interests
 from app.services.cost_estimator import CostEstimatorService
-from app.services.groq_service import generate_itinerary_with_ai
 
 
 class ChildActivityService:
@@ -86,68 +83,48 @@ class ItineraryService:
             [a for a in (dest.attractions or []) if a.family_friendly],
             key=lambda a: a.price,
         )
-        attraction_names = [a.name for a in attractions]
-
-        members_list = [
-            {"age": m.age, "interests": m.interests if hasattr(m, "interests") else []}
-            for m in request.members
-        ]
-
-        city = dest.city.name if dest.city else "destination"
-        country = dest.city.country.name if dest.city and dest.city.country else ""
-
-        # AI генерирање на итинерар
-        ai_text = await generate_itinerary_with_ai(
-            city=city,
-            country=country,
-            duration_days=request.duration_days,
-            members=members_list,
-            budget=request.budget if hasattr(request, "budget") else 1000,
-            attractions=attraction_names,
-        )
-
-        # Парсирај го AI текстот во денови
         days = []
-        lines = ai_text.strip().split("\n")
-        current_day_num = 0
-        current_items = []
-        current_title = ""
+        total_cost = 0.0
 
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            if line.lower().startswith("day ") and ":" in line:
-                if current_day_num > 0:
-                    days.append(ItineraryDayRead(
-                        day_number=current_day_num,
-                        title=current_title,
-                        items=current_items,
-                    ))
-                current_day_num += 1
-                current_title = line
-                current_items = []
-            elif current_day_num > 0 and line.startswith("-"):
-                current_items.append(ItineraryDayItem(
-                    time="",
-                    activity=line[1:].strip(),
-                    estimated_cost=0,
-                ))
+        for day_num in range(1, request.duration_days + 1):
+            items = []
+            if day_num == 1:
+                items.append(ItineraryDayItem(time="Morning", activity="Arrival & hotel check-in", estimated_cost=0))
+                if attractions:
+                    att = attractions[0]
+                    items.append(
+                        ItineraryDayItem(
+                            time="Afternoon",
+                            activity=att.name,
+                            description=att.description,
+                            estimated_cost=att.price * len(request.members),
+                        )
+                    )
+                    total_cost += att.price * len(request.members)
+                title = f"Day {day_num}: Arrival in {dest.city.name if dest.city else 'destination'}"
+            elif day_num == request.duration_days:
+                items.append(ItineraryDayItem(time="Morning", activity="Souvenir shopping & leisure", estimated_cost=0))
+                items.append(ItineraryDayItem(time="Afternoon", activity="Departure", estimated_cost=0))
+                title = f"Day {day_num}: Departure"
+            else:
+                att_idx = (day_num - 2) % max(len(attractions), 1)
+                if attractions:
+                    att = attractions[att_idx]
+                    items.append(
+                        ItineraryDayItem(
+                            time="Full day",
+                            activity=att.name,
+                            description=att.description,
+                            estimated_cost=att.price * len(request.members),
+                        )
+                    )
+                    total_cost += att.price * len(request.members)
+                    title = f"Day {day_num}: {att.name}"
+                else:
+                    items.append(ItineraryDayItem(time="Full day", activity="City exploration", estimated_cost=0))
+                    title = f"Day {day_num}: Explore the city"
 
-        if current_day_num > 0:
-            days.append(ItineraryDayRead(
-                day_number=current_day_num,
-                title=current_title,
-                items=current_items,
-            ))
-
-        # Ако парсирањето не успеало, стави го AI текстот во еден ден
-        if not days:
-            days.append(ItineraryDayRead(
-                day_number=1,
-                title="Your AI-Generated Itinerary",
-                items=[ItineraryDayItem(time="", activity=ai_text, estimated_cost=0)],
-            ))
+            days.append(ItineraryDayRead(day_number=day_num, title=title, items=items))
 
         end_date = request.start_date + timedelta(days=request.duration_days) if request.start_date else None
         estimate = await self.cost_estimator.estimate_trip(
@@ -156,12 +133,12 @@ class ItineraryService:
             request.start_date,
             end_date,
         )
+        total_cost += estimate["flight"] + estimate["accommodation"]
 
         return ItineraryResponse(
             destination_id=dest.id,
-            city=city,
-            country=country,
-            total_estimated_cost=round(estimate["flight"] + estimate["accommodation"], 2),
+            city=dest.city.name if dest.city else "",
+            country=dest.city.country.name if dest.city and dest.city.country else "",
+            total_estimated_cost=round(total_cost, 2),
             days=days,
         )
->>>>>>> feature/ai-recommendation-explanations
