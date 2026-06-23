@@ -27,6 +27,8 @@ class HybridRecommendationService:
             cost = await cost_estimator(dest)
             if cost.get("same_origin"):
                 continue
+            if cost["total"] > context.budget:
+                continue
 
             result = self.rule_scorer.score_destination(
                 dest, context, cost["total"], dest.attractions or []

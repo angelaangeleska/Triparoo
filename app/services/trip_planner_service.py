@@ -120,6 +120,7 @@ class TripPlannerService:
                 request.end_date,
                 origin_location=request.origin_location,
                 origin_airport_id=request.origin_airport_id,
+                preferred_month=request.preferred_month,
             )
 
         ranked = await self.recommendation_service.rank(context, eligible, cost_fn)
@@ -150,6 +151,8 @@ class TripPlannerService:
             explanation_map = {}
         recommendations = []
         for r in ranked:
+            if r["estimated_total_cost"] > request.budget:
+                continue
             attractions = [
                 AttractionSummary(
                     id=attr_map[aid].id,
