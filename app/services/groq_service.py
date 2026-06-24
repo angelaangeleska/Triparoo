@@ -1,8 +1,12 @@
 from groq import Groq
+
 from app.core.config import settings
 
 
-client = Groq(api_key=settings.GROQ_API_KEY)
+def _get_client() -> Groq | None:
+    if not settings.GROQ_API_KEY.strip():
+        return None
+    return Groq(api_key=settings.GROQ_API_KEY)
 
 
 async def generate_itinerary_with_ai(
@@ -12,7 +16,7 @@ async def generate_itinerary_with_ai(
     members: list,
     budget: float,
     attractions: list[str],
-) -> str:
+) -> str | None:
     members_desc = []
     for m in members:
         age = m.get("age", "?")
@@ -39,6 +43,10 @@ For each day provide:
 
 Make it engaging, family-friendly, and realistic. Format each day clearly as "Day 1:", "Day 2:", etc."""
 
+    client = _get_client()
+    if not client:
+        return None
+
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -59,6 +67,10 @@ async def explain_recommendations_with_ai(
     budget: float,
     destinations: list[dict],
 ) -> list[dict]:
+    client = _get_client()
+    if not client:
+        return []
+
     print("GROQ CALLED")
     members_desc = []
     for m in context_members:

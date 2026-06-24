@@ -46,6 +46,7 @@ export default function DestinationDetailPage() {
     endDate?: string
     partySize?: number
     originLocation?: string
+    budget?: number
   } | null
 
   const [destination, setDestination] = useState<Destination | null>(null)
@@ -57,7 +58,7 @@ export default function DestinationDetailPage() {
 
   // Itinerary state
   const [duration, setDuration] = useState(5)
-  const [itineraryBudget, setItineraryBudget] = useState(1500)
+  const [itineraryBudget, setItineraryBudget] = useState(tripState?.budget ?? 1500)
   const [itinerary, setItinerary] = useState<ItineraryDay[] | null>(null)
   const [itineraryCost, setItineraryCost] = useState(0)
   const [itineraryLoading, setItineraryLoading] = useState(false)
@@ -213,7 +214,7 @@ export default function DestinationDetailPage() {
         destination_id: destId,
         origin_location: datesOrigin.trim() || tripState?.originLocation || undefined,
         members: defaultMembers,
-        budget: 1500,
+        budget: tripState?.budget ?? itineraryBudget,
         start_date: tripState?.startDate || localDateOffset(30),
         end_date: tripState?.endDate || localDateOffset(37),
       })

@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     HYBRID_RULE_WEIGHT: float = 0.7
     HYBRID_LLM_WEIGHT: float = 0.3
 
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = "http://localhost:5180,http://localhost:3000,http://127.0.0.1:5180"
 
 
 settings = Settings()

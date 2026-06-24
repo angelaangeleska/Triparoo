@@ -27,7 +27,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/family_trip_planner
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "true"
-      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+      CORS_ORIGINS: "http://localhost:5180,http://localhost:3000,http://127.0.0.1:5180"
       SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
       FLIGHT_PROVIDER: ${FLIGHT_PROVIDER:-auto}
       ACCOMMODATION_PROVIDER: ${ACCOMMODATION_PROVIDER:-serpapi}
@@ -50,10 +50,10 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     ports:
-      - "5173:5173"
+      - "5180:5180"
     environment:
       VITE_API_URL: http://localhost:8000/api/v1
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5180"
     depends_on:
       - api
 

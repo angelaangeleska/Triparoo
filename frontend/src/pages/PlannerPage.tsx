@@ -304,6 +304,7 @@ export default function PlannerPage() {
               <RecommendationCard
                 rec={rec}
                 rank={i + 1}
+                budget={budget}
                 startDate={startDate || undefined}
                 endDate={endDate || undefined}
                 partySize={members.length}

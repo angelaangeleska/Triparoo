@@ -31,7 +31,7 @@ docker compose up --build
 ```
 
 - API: http://localhost:8000
-- **Frontend:** http://localhost:5173
+- **Frontend:** http://localhost:5180
 - OpenAPI docs: http://localhost:8000/docs
 - Demo user: `demo@familytrip.com` / `DemoPass123!`
 
@@ -51,7 +51,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — the Vite dev server proxies `/api` to the backend.
+Open http://localhost:5180 — the Vite dev server proxies `/api` to the backend.
 
 ### Pages
 
