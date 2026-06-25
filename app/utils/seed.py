@@ -270,12 +270,19 @@ async def seed() -> None:
             await _seed_missing_destinations(session)
             await _ensure_demo_user(session)
             await session.commit()
+            from app.utils.seed_price_cache import seed_price_cache
+
+            await seed_price_cache()
             return
 
         await _seed_all_destinations(session)
         await _ensure_demo_user(session)
         await session.commit()
         logger.info("Seeded %d destinations with attractions and seasons", len(DESTINATIONS))
+
+        from app.utils.seed_price_cache import seed_price_cache
+
+        await seed_price_cache()
 
 
 async def _seed_all_destinations(session) -> None:

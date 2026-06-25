@@ -102,3 +102,15 @@ class FlightRead(BaseModel):
     price: float
     airline: str
     seats_remaining: Optional[int] = None
+
+
+class FlightOfferCacheRead(BaseModel):
+    id: int
+    origin_iata: str
+    destination_iata: str
+    departure_date: str
+    return_date: Optional[str] = None
+    party_size: int
+    total_price: float
+    airline: str
+    source: str = "db"

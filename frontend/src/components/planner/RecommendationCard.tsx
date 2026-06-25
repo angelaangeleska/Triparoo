@@ -60,7 +60,11 @@ export default function RecommendationCard({ rec, rank, budget, startDate, endDa
             <div className="rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-brand-600">
               Flights from €{rec.flight_cost.toFixed(0)} for your party
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-xl border border-dashed border-brand-200 bg-brand-50/30 px-4 py-3 text-sm text-brand-500">
+              Enter a departure city to include flight prices in this estimate.
+            </div>
+          )}
 
           {rec.accommodation && (
             <div className="space-y-1.5">

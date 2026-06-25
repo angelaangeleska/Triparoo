@@ -35,7 +35,7 @@ export default function PlannerPage() {
   const [preferredMonth, setPreferredMonth] = useState(8)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [originLocation, setOriginLocation] = useState('')
+  const [originLocation, setOriginLocation] = useState('Sofia, Bulgaria')
   const [recommendations, setRecommendations] = useState<DestinationRecommendation[]>([])
   const [originMessage, setOriginMessage] = useState('')
   const [loading, setLoading] = useState(false)

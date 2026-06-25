@@ -33,7 +33,7 @@ services:
       ACCOMMODATION_PROVIDER: ${ACCOMMODATION_PROVIDER:-serpapi}
       AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID:-}
       AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      USE_DB_PRICES: ${USE_DB_PRICES:-true}
     depends_on:
       db:
         condition: service_healthy
@@ -41,6 +41,7 @@ services:
       sh -c "alembic upgrade head &&
              python -m app.utils.build_airport_catalog &&
              python -m app.utils.seed &&
+             python -m app.utils.seed_price_cache &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:

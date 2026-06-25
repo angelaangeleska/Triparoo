@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import NotFoundError
 from app.recommendation.base import MemberContext, RecommendationContext
 from app.recommendation.hybrid import HybridRecommendationService
@@ -105,6 +106,15 @@ class TripPlannerService:
         resolved, origin_iatas, origin_airport_ids, origin_airport_id, origin_message, origin_label = (
             await self._resolve_origin(request)
         )
+        if (
+            not request.origin_location
+            and not request.origin_airport_id
+            and settings.should_use_db_prices()
+        ):
+            origin_message = (
+                "Using cached demo flights from Sofia, Bulgaria (SOF). "
+                "Enter your departure city to personalize flight prices."
+            )
         excluded = self.origin_resolver.get_excluded_destination_ids(
             destinations, origin_airport_ids, resolved, origin_iatas
         )

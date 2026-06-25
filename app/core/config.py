@@ -1,9 +1,12 @@
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file="..env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "env", "..env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     APP_NAME: str = "Family Trip Planner"
     APP_VERSION: str = "1.0.0"
@@ -30,6 +33,8 @@ class Settings(BaseSettings):
 
     SERPAPI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    # When true, flight/hotel prices come from DB cache instead of SerpAPI
+    USE_DB_PRICES: bool = False
     # Rule engine weights (sum used for normalization)
     WEIGHT_CHILD_AGE: float = 0.20
     WEIGHT_BUDGET: float = 0.20
@@ -44,6 +49,16 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:5180,http://localhost:3000,http://127.0.0.1:5180"
 
+    def should_use_db_prices(self) -> bool:
+        """Use DB cache when explicitly enabled or when no live price API is configured."""
+        if self.USE_DB_PRICES:
+            return True
+        if self.SERPAPI_API_KEY:
+            return False
+        mode = self.FLIGHT_PROVIDER.lower()
+        if mode in ("amadeus", "live") and self.AMADEUS_CLIENT_ID and self.AMADEUS_CLIENT_SECRET:
+            return False
+        return True
+
 
 settings = Settings()
-

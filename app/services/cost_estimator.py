@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.integrations.accommodations.base import AccommodationSearchCriteria
 from app.integrations.accommodations.factory import get_accommodation_provider
 from app.integrations.accommodations.serialize import accommodation_to_dict
@@ -11,12 +12,14 @@ from app.integrations.flights.serialize import build_flight_summary
 from app.models.destination import Destination
 from app.services.origin_resolver import OriginResolverService
 
+DEFAULT_DB_ORIGIN = "Sofia, Bulgaria"
+
 
 class CostEstimatorService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.flight_provider = get_flight_provider(session)
-        self.accommodation_provider = get_accommodation_provider()
+        self.accommodation_provider = get_accommodation_provider(session)
         self.origin_resolver = OriginResolverService(session)
 
     async def _best_round_trip(
@@ -113,6 +116,19 @@ class CostEstimatorService:
         origin_iatas, origin_ids, origin_message = await self.origin_resolver.resolve_airports(
             origin_location, origin_airport_id
         )
+        if (
+            not origin_iatas
+            and settings.should_use_db_prices()
+            and not origin_location
+            and not origin_airport_id
+        ):
+            origin_iatas, origin_ids, _ = await self.origin_resolver.resolve_airports(
+                DEFAULT_DB_ORIGIN, None
+            )
+            origin_message = (
+                f"Using cached demo flights departing from {DEFAULT_DB_ORIGIN}. "
+                "Enter your city above to personalize flight prices."
+            )
         if not origin_iatas and not origin_message:
             if origin_location or origin_airport_id:
                 origin_message = "Could not find airports for that departure location."

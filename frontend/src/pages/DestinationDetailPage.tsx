@@ -72,7 +72,7 @@ export default function DestinationDetailPage() {
 
   // Cheapest dates
   const [cheapestPeriods, setCheapestPeriods] = useState<CheapestPeriod[]>([])
-  const [datesOrigin, setDatesOrigin] = useState(tripState?.originLocation || '')
+  const [datesOrigin, setDatesOrigin] = useState(tripState?.originLocation || 'Sofia, Bulgaria')
   const [datesPartySize, setDatesPartySize] = useState(tripState?.partySize ?? 3)
   const [datesOriginMessage, setDatesOriginMessage] = useState('')
   const [datesLoading, setDatesLoading] = useState(false)
