@@ -247,6 +247,15 @@ export const api = {
       within_budget: boolean
       alternatives: BudgetAlternative[]
     }>('/trip-planner/budget-optimize', { method: 'POST', body: JSON.stringify(data) }),
+    
+    chat: (data: {
+    message: string
+    history: { role: string; content: string }[]
+  }) =>
+    request<{ response: string }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 }
 
 export { ApiError }
