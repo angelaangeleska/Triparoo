@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.integrations.accommodations.base import AccommodationSearchCriteria
 from app.integrations.accommodations.factory import get_accommodation_provider
 from app.integrations.accommodations.serialize import accommodation_to_dict
@@ -11,12 +12,14 @@ from app.integrations.flights.serialize import build_flight_summary
 from app.models.destination import Destination
 from app.services.origin_resolver import OriginResolverService
 
+DEFAULT_DB_ORIGIN = "Sofia, Bulgaria"
+
 
 class CostEstimatorService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.flight_provider = get_flight_provider(session)
-        self.accommodation_provider = get_accommodation_provider()
+        self.accommodation_provider = get_accommodation_provider(session)
         self.origin_resolver = OriginResolverService(session)
 
     async def _best_round_trip(
@@ -73,6 +76,26 @@ class CostEstimatorService:
             return outbound.price
         return outbound.price + (return_offer.price if return_offer else 0.0)
 
+    def _default_trip_dates(
+        self,
+        start_date: date | None,
+        end_date: date | None,
+        preferred_month: int | None = None,
+    ) -> tuple[date, date]:
+        if start_date and end_date:
+            return start_date, end_date
+        if start_date and not end_date:
+            return start_date, start_date + timedelta(days=5)
+        if preferred_month:
+            today = date.today()
+            year = today.year
+            if preferred_month < today.month or (preferred_month == today.month and today.day > 20):
+                year += 1
+            start = date(year, preferred_month, 7)
+            return start, start + timedelta(days=5)
+        start = date.today() + timedelta(days=30)
+        return start, start + timedelta(days=5)
+
     async def estimate_trip(
         self,
         destination: Destination,
@@ -81,11 +104,9 @@ class CostEstimatorService:
         end_date: date | None,
         origin_location: str | None = None,
         origin_airport_id: int | None = None,
+        preferred_month: int | None = None,
     ) -> dict:
-        if not start_date:
-            start_date = date.today() + timedelta(days=30)
-        if not end_date:
-            end_date = start_date + timedelta(days=5)
+        start_date, end_date = self._default_trip_dates(start_date, end_date, preferred_month)
         nights = max((end_date - start_date).days, 1)
 
         flight_cost = 0.0
@@ -95,6 +116,19 @@ class CostEstimatorService:
         origin_iatas, origin_ids, origin_message = await self.origin_resolver.resolve_airports(
             origin_location, origin_airport_id
         )
+        if (
+            not origin_iatas
+            and settings.should_use_db_prices()
+            and not origin_location
+            and not origin_airport_id
+        ):
+            origin_iatas, origin_ids, _ = await self.origin_resolver.resolve_airports(
+                DEFAULT_DB_ORIGIN, None
+            )
+            origin_message = (
+                f"Using cached demo flights departing from {DEFAULT_DB_ORIGIN}. "
+                "Enter your city above to personalize flight prices."
+            )
         if not origin_iatas and not origin_message:
             if origin_location or origin_airport_id:
                 origin_message = "Could not find airports for that departure location."

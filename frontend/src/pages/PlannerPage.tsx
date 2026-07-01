@@ -35,7 +35,7 @@ export default function PlannerPage() {
   const [preferredMonth, setPreferredMonth] = useState(8)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [originLocation, setOriginLocation] = useState('')
+  const [originLocation, setOriginLocation] = useState('Sofia, Bulgaria')
   const [recommendations, setRecommendations] = useState<DestinationRecommendation[]>([])
   const [originMessage, setOriginMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -69,7 +69,7 @@ export default function PlannerPage() {
         end_date: endDate || undefined,
         origin_location: originLocation.trim() || undefined,
       })
-      setRecommendations(res.recommendations)
+      setRecommendations(res.recommendations.filter((r) => r.estimated_total_cost <= budget))
       setOriginMessage(res.origin_message || '')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Search failed')
@@ -304,6 +304,7 @@ export default function PlannerPage() {
               <RecommendationCard
                 rec={rec}
                 rank={i + 1}
+                budget={budget}
                 startDate={startDate || undefined}
                 endDate={endDate || undefined}
                 partySize={members.length}

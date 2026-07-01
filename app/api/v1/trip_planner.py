@@ -66,11 +66,12 @@ async def search_hotels(
     adults: int = Query(default=2, ge=1),
     children: int = Query(default=0, ge=0),
     country: str = Query(default="", description="Country name for more accurate results"),
+    session=Depends(get_db),
 ):
-    if not settings.SERPAPI_API_KEY:
+    if not settings.SERPAPI_API_KEY and not settings.should_use_db_prices():
         raise HTTPException(status_code=503, detail="Hotel search is not configured (missing SERPAPI_API_KEY)")
 
-    provider = get_accommodation_provider()
+    provider = get_accommodation_provider(session)
     try:
         offers = await provider.search(
             AccommodationSearchCriteria(

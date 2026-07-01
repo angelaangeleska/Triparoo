@@ -10,13 +10,14 @@ import ScoreBreakdownChart from './ScoreBreakdownChart'
 interface Props {
   rec: DestinationRecommendation
   rank: number
+  budget?: number
   startDate?: string
   endDate?: string
   partySize?: number
   originLocation?: string
 }
 
-export default function RecommendationCard({ rec, rank, startDate, endDate, partySize, originLocation }: Props) {
+export default function RecommendationCard({ rec, rank, budget, startDate, endDate, partySize, originLocation }: Props) {
   const flight = normalizeFlightSummary(rec.flight)
 
   return (
@@ -59,7 +60,11 @@ export default function RecommendationCard({ rec, rank, startDate, endDate, part
             <div className="rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-brand-600">
               Flights from €{rec.flight_cost.toFixed(0)} for your party
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-xl border border-dashed border-brand-200 bg-brand-50/30 px-4 py-3 text-sm text-brand-500">
+              Enter a departure city to include flight prices in this estimate.
+            </div>
+          )}
 
           {rec.accommodation && (
             <div className="space-y-1.5">
@@ -103,7 +108,7 @@ export default function RecommendationCard({ rec, rank, startDate, endDate, part
 
           <Link
             to={`/destinations/${rec.destination_id}`}
-            state={{ startDate, endDate, partySize, originLocation }}
+            state={{ startDate, endDate, partySize, originLocation, budget }}
             className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors group/link"
           >
             Explore {rec.city}

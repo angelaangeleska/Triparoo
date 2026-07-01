@@ -75,6 +75,31 @@ class ItineraryService:
         self.dest_repo = DestinationRepository(session)
         self.cost_estimator = CostEstimatorService(session)
 
+    @staticmethod
+    def _build_fallback_itinerary(
+        city: str,
+        country: str,
+        duration_days: int,
+        budget: float,
+        attractions: list,
+    ) -> str:
+        daily_budget = max(budget / duration_days, 50.0)
+        names = [a.name for a in attractions] if attractions else [f"local sights in {city}"]
+        lines: list[str] = []
+
+        for day in range(1, duration_days + 1):
+            lines.append(f"Day {day}: Family day in {city}")
+            morning = names[(day - 1) % len(names)]
+            afternoon = names[(day) % len(names)]
+            evening = names[(day + 1) % len(names)]
+            lines.append(f"- Morning: Explore {morning}")
+            lines.append(f"- Afternoon: Visit {afternoon}")
+            lines.append(
+                f"- Evening: Relax and dinner (~€{daily_budget * 0.35:.0f} estimated for the family)"
+            )
+
+        return "\n".join(lines)
+
     async def generate(self, request: ItineraryRequest) -> ItineraryResponse:
         dest = await self.dest_repo.get_with_relations(request.destination_id)
         if not dest:
@@ -94,15 +119,23 @@ class ItineraryService:
         city = dest.city.name if dest.city else "destination"
         country = dest.city.country.name if dest.city and dest.city.country else ""
 
-        # AI генерирање на итинерар
-        ai_text = await generate_itinerary_with_ai(
-            city=city,
-            country=country,
-            duration_days=request.duration_days,
-            members=members_list,
-            budget=request.budget if hasattr(request, "budget") else 1000,
-            attractions=attraction_names,
-        )
+        # AI генерирање на итинерар (fallback to template when Groq is unavailable)
+        ai_text = None
+        try:
+            ai_text = await generate_itinerary_with_ai(
+                city=city,
+                country=country,
+                duration_days=request.duration_days,
+                members=members_list,
+                budget=request.budget if hasattr(request, "budget") else 1000,
+                attractions=attraction_names,
+            )
+        except Exception:
+            ai_text = None
+        if not ai_text:
+            ai_text = self._build_fallback_itinerary(
+                city, country, request.duration_days, request.budget, attractions
+            )
 
         # Парсирај го AI текстот во денови
         days = []

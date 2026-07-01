@@ -9,6 +9,7 @@ from app.models.activity import Activity
 from app.models.attraction import Attraction
 from app.models.country import Airport
 from app.models.flight import Flight
+from app.models.offer_cache import FlightOfferCache
 from app.repositories.catalog import AirportRepository, DestinationRepository
 from app.schemas.catalog import (
     AccommodationRead,
@@ -17,6 +18,7 @@ from app.schemas.catalog import (
     AirportSearchResult,
     AttractionRead,
     DestinationRead,
+    FlightOfferCacheRead,
     FlightRead,
 )
 from app.services.airport_search import AirportSearchService
@@ -136,6 +138,73 @@ async def list_accommodations(
     return list(result.scalars().all())
 
 
+@router.get("/flight-offers", response_model=list[FlightOfferCacheRead])
+async def list_flight_offers(
+    origin_iata: str | None = Query(default=None, min_length=3, max_length=3),
+    destination_iata: str | None = Query(default=None, min_length=3, max_length=3),
+    session=Depends(get_db),
+):
+    """Cached flight offers (SerpAPI-shaped test data stored in flight_offer_cache)."""
+    query = select(FlightOfferCache).order_by(FlightOfferCache.id)
+    if origin_iata:
+        query = query.where(FlightOfferCache.origin_iata == origin_iata.upper())
+    if destination_iata:
+        query = query.where(FlightOfferCache.destination_iata == destination_iata.upper())
+    result = await session.execute(query)
+    rows = result.scalars().all()
+    return [
+        FlightOfferCacheRead(
+            id=row.id,
+            origin_iata=row.origin_iata,
+            destination_iata=row.destination_iata,
+            departure_date=row.departure_date.isoformat(),
+            return_date=row.return_date.isoformat() if row.return_date else None,
+            party_size=row.party_size,
+            total_price=float(row.payload.get("total_price") or 0),
+            airline=(row.payload.get("outbound") or {}).get("airline", ""),
+            source=row.payload.get("source", "db"),
+        )
+        for row in rows
+    ]
+
+
+async def _flights_from_cache(
+    session,
+    origin: int | None,
+    destination: int | None,
+) -> list[FlightRead]:
+    airport_result = await session.execute(select(Airport))
+    airports = {a.iata_code.upper(): a for a in airport_result.scalars().all()}
+
+    cache_result = await session.execute(select(FlightOfferCache).order_by(FlightOfferCache.id))
+    rows = cache_result.scalars().all()
+    flights: list[FlightRead] = []
+
+    for row in rows:
+        origin_ap = airports.get(row.origin_iata.upper())
+        dest_ap = airports.get(row.destination_iata.upper())
+        if not origin_ap or not dest_ap:
+            continue
+        if origin and origin_ap.id != origin:
+            continue
+        if destination and dest_ap.id != destination:
+            continue
+        outbound = row.payload.get("outbound") or {}
+        dep_raw = outbound.get("departure_date") or f"{row.departure_date.isoformat()}T10:00:00"
+        flights.append(
+            FlightRead(
+                id=row.id,
+                origin_airport_id=origin_ap.id,
+                destination_airport_id=dest_ap.id,
+                departure_date=dep_raw,
+                price=float(row.payload.get("total_price") or outbound.get("price") or 0),
+                airline=outbound.get("airline", "Unknown"),
+                seats_remaining=outbound.get("seats_remaining"),
+            )
+        )
+    return flights
+
+
 @router.get("/flights", response_model=list[FlightRead])
 async def list_flights(
     origin: int | None = Query(default=None),
@@ -149,15 +218,17 @@ async def list_flights(
         query = query.where(Flight.destination_airport_id == destination)
     result = await session.execute(query)
     flights = result.scalars().all()
-    return [
-        FlightRead(
-            id=f.id,
-            origin_airport_id=f.origin_airport_id,
-            destination_airport_id=f.destination_airport_id,
-            departure_date=f.departure_date.isoformat(),
-            price=f.price,
-            airline=f.airline,
-            seats_remaining=f.seats_remaining,
-        )
-        for f in flights
-    ]
+    if flights:
+        return [
+            FlightRead(
+                id=f.id,
+                origin_airport_id=f.origin_airport_id,
+                destination_airport_id=f.destination_airport_id,
+                departure_date=f.departure_date.isoformat(),
+                price=f.price,
+                airline=f.airline,
+                seats_remaining=f.seats_remaining,
+            )
+            for f in flights
+        ]
+    return await _flights_from_cache(session, origin, destination)

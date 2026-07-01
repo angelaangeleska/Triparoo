@@ -18,7 +18,8 @@ async def lifespan(app: FastAPI):
     app.state.airport_catalog_size = len(catalog.airports)
     app.state.flight_provider = flight_provider_label()
     app.state.flight_provider_ready = bool(
-        settings.SERPAPI_API_KEY
+        settings.should_use_db_prices()
+        or settings.SERPAPI_API_KEY
         or (settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET)
     )
     yield
@@ -58,7 +59,7 @@ def create_app() -> FastAPI:
         hint = None
         if not ready:
             hint = (
-                "Add SERPAPI_API_KEY (recommended) or AMADEUS_CLIENT_ID/AMADEUS_CLIENT_SECRET to ..env — "
+                "Add SERPAPI_API_KEY, AMADEUS credentials, or set USE_DB_PRICES=true for cached DB prices — "
                 "SerpAPI: https://serpapi.com/manage-api-key | Amadeus: https://developers.amadeus.com"
             )
         elif provider == "amadeus" and not settings.AMADEUS_CLIENT_ID:

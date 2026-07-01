@@ -14,7 +14,7 @@ class BudgetOptimizationService:
     def __init__(self, session: AsyncSession):
         self.dest_repo = DestinationRepository(session)
         self.cost_estimator = CostEstimatorService(session)
-        self.accommodation_provider = get_accommodation_provider()
+        self.accommodation_provider = get_accommodation_provider(session)
 
     async def optimize(self, request: BudgetOptimizeRequest) -> BudgetOptimizeResponse:
         dest = await self.dest_repo.get_with_relations(request.destination_id)
