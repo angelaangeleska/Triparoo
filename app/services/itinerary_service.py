@@ -15,6 +15,7 @@ from app.schemas.trip_planner import (
 )
 from app.services.activity_matching import attraction_matches_interest, attraction_matches_interests
 from app.services.cost_estimator import CostEstimatorService
+from app.services.groq_service import generate_itinerary_narratives
 
 
 class ChildActivityService:
@@ -126,6 +127,12 @@ class ItineraryService:
 
             days.append(ItineraryDayRead(day_number=day_num, title=title, items=items))
 
+        city_name = dest.city.name if dest.city else ""
+        country_name = dest.city.country.name if dest.city and dest.city.country else ""
+        narratives = await generate_itinerary_narratives(city_name, country_name, days)
+        for day in days:
+            day.narrative = narratives.get(day.day_number)
+
         end_date = request.start_date + timedelta(days=request.duration_days) if request.start_date else None
         estimate = await self.cost_estimator.estimate_trip(
             dest,
@@ -137,8 +144,8 @@ class ItineraryService:
 
         return ItineraryResponse(
             destination_id=dest.id,
-            city=dest.city.name if dest.city else "",
-            country=dest.city.country.name if dest.city and dest.city.country else "",
+            city=city_name,
+            country=country_name,
             total_estimated_cost=round(total_cost, 2),
             days=days,
         )

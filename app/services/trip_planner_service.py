@@ -157,6 +157,7 @@ class TripPlannerService:
                     accommodation=self._accommodation_summary(r.get("accommodation_offer")),
                     score_breakdown=ScoreBreakdown(**r["score_breakdown"]),
                     explanation=r["explanation"],
+                    highlights=r.get("highlights", []),
                     suggested_attractions=attractions,
                 )
             )

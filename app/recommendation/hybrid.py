@@ -1,5 +1,6 @@
 from app.core.config import settings
-from app.recommendation.base import RecommendationContext, ScoredDestination
+from app.recommendation.base import RecommendationContext, RecommendationProvider, ScoredDestination
+from app.recommendation.factory import get_recommendation_provider
 from app.recommendation.rule_engine import RuleBasedScorer
 
 
@@ -7,8 +8,10 @@ class HybridRecommendationService:
     def __init__(
         self,
         rule_scorer: RuleBasedScorer | None = None,
+        recommendation_provider: RecommendationProvider | None = None,
     ):
         self.rule_scorer = rule_scorer or RuleBasedScorer()
+        self.recommendation_provider = recommendation_provider or get_recommendation_provider()
 
     def _origin_flight_boost(self, context: RecommendationContext, flight_cost: float) -> float:
         if not context.origin_airport_id or flight_cost <= 0:
@@ -55,16 +58,24 @@ class HybridRecommendationService:
         scored.sort(key=lambda s: (s.rule_score, -s.estimated_total_cost), reverse=True)
         top = scored[:10]
 
+        explanations = await self.recommendation_provider.explain_recommendations(context, top)
+        explanation_by_id = {e.destination_id: e for e in explanations}
+
         results = []
         for s in top:
+            exp = explanation_by_id.get(s.destination_id)
+            llm_score = max(0.0, min(100.0, exp.llm_score if exp else s.rule_score))
+            final_score = round(
+                settings.HYBRID_RULE_WEIGHT * s.rule_score + settings.HYBRID_LLM_WEIGHT * llm_score, 2
+            )
             results.append(
                 {
                     "destination_id": s.destination_id,
                     "city": s.city,
                     "country": s.country,
                     "rule_score": s.rule_score,
-                    "llm_score": s.rule_score,
-                    "final_score": round(s.rule_score, 2),
+                    "llm_score": round(llm_score, 2),
+                    "final_score": final_score,
                     "estimated_total_cost": s.estimated_total_cost,
                     "flight_cost": s.flight_cost,
                     "accommodation_cost": s.accommodation_cost,
@@ -72,7 +83,8 @@ class HybridRecommendationService:
                     "flight_offer": s.flight_offer,
                     "accommodation_offer": s.accommodation_offer,
                     "score_breakdown": s.score_breakdown,
-                    "explanation": "",
+                    "explanation": exp.explanation if exp else "",
+                    "highlights": exp.highlights if exp else [],
                     "suggested_attraction_ids": s.suggested_attraction_ids,
                 }
             )

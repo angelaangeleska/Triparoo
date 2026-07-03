@@ -128,6 +128,7 @@ class DestinationRecommendation(BaseModel):
     accommodation: Optional[AccommodationSummary] = None
     score_breakdown: ScoreBreakdown
     explanation: str
+    highlights: list[str] = Field(default_factory=list)
     suggested_attractions: list[AttractionSummary]
 
 
@@ -208,6 +209,7 @@ class ItineraryDayRead(BaseModel):
     day_number: int
     title: str
     items: list[ItineraryDayItem]
+    narrative: Optional[str] = None
 
 
 class ItineraryResponse(BaseModel):

@@ -18,7 +18,12 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
-    RECOMMENDATION_PROVIDER: str = "rule"
+    # TODO: get a free key at https://console.groq.com/keys. Powers real AI-generated
+    # recommendation explanations (app/services/groq_service.py), itinerary narratives,
+    # and the AI Trip Guide (app/services/ai_trip_guide_service.py). Falls back to
+    # deterministic rule-based text when unset — never crashes without it.
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # TODO: professor will supply real Amadeus for Developers credentials —
     # https://developers.amadeus.com/my-apps. Amadeus is the sole flight and

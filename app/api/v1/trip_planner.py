@@ -10,6 +10,7 @@ from app.integrations.accommodations.base import AccommodationSearchCriteria
 from app.integrations.accommodations.factory import get_accommodation_provider
 from app.integrations.accommodations.serialize import accommodation_to_dict
 from app.models.user import User
+from app.schemas.ai_guide import AITripGuideRequest, AITripGuideResponse
 from app.schemas.trip_planner import (
     AccommodationSummary,
     BookingSourceSummary,
@@ -27,6 +28,7 @@ from app.schemas.trip_planner import (
     RecommendResponse,
     ResolvedOriginRead,
 )
+from app.services.ai_trip_guide_service import AITripGuideService
 from app.services.budget_service import BudgetOptimizationService
 from app.services.itinerary_service import ChildActivityService, ItineraryService
 from app.services.origin_resolver import OriginResolverService
@@ -184,5 +186,18 @@ async def budget_optimize(
     try:
         service = BudgetOptimizationService(session)
         return await service.optimize(payload)
+    except AppException as exc:
+        raise handle_app_exception(exc)
+
+
+@router.post("/ai-guide", response_model=AITripGuideResponse)
+async def ai_trip_guide(
+    payload: AITripGuideRequest,
+    session=Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    try:
+        service = AITripGuideService(session)
+        return await service.generate(payload)
     except AppException as exc:
         raise handle_app_exception(exc)
