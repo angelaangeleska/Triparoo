@@ -19,15 +19,14 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     RECOMMENDATION_PROVIDER: str = "rule"
-    FLIGHT_PROVIDER: str = "serpapi"
-    ACCOMMODATION_PROVIDER: str = "serpapi"
 
+    # TODO: professor will supply real Amadeus for Developers credentials —
+    # https://developers.amadeus.com/my-apps. Amadeus is the sole flight and
+    # hotel provider (see app/integrations/flights/factory.py and
+    # app/integrations/accommodations/factory.py).
     AMADEUS_CLIENT_ID: str = ""
     AMADEUS_CLIENT_SECRET: str = ""
     AMADEUS_BASE_URL: str = "https://test.api.amadeus.com"
-    AMADEUS_FALLBACK_TO_ESTIMATES: bool = False
-
-    SERPAPI_API_KEY: str = ""
 
     # Rule engine weights (sum used for normalization)
     WEIGHT_CHILD_AGE: float = 0.20

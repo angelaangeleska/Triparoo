@@ -39,7 +39,7 @@ class AccommodationOffer:
     amenities: list[str] = field(default_factory=list)
     check_in_time: str = ""
     check_out_time: str = ""
-    source: str = "serpapi"
+    source: str = "amadeus"
 
 
 class AccommodationProvider(Protocol):

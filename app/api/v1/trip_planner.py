@@ -46,7 +46,7 @@ def _to_accommodation_summary(data: dict) -> AccommodationSummary:
         reviews_count=data.get("reviews_count"),
         price_per_night=data.get("price_per_night", 0.0),
         total_price=data.get("total_price", 0.0),
-        currency=data.get("currency", "USD"),
+        currency=data.get("currency", "EUR"),
         family_friendly=data.get("family_friendly", False),
         image_url=data.get("image_url", ""),
         google_url=data.get("google_url", ""),
@@ -54,7 +54,7 @@ def _to_accommodation_summary(data: dict) -> AccommodationSummary:
         amenities=data.get("amenities") or [],
         check_in_time=data.get("check_in_time", ""),
         check_out_time=data.get("check_out_time", ""),
-        source=data.get("source", "serpapi"),
+        source=data.get("source", "amadeus"),
     )
 
 
@@ -67,8 +67,11 @@ async def search_hotels(
     children: int = Query(default=0, ge=0),
     country: str = Query(default="", description="Country name for more accurate results"),
 ):
-    if not settings.SERPAPI_API_KEY:
-        raise HTTPException(status_code=503, detail="Hotel search is not configured (missing SERPAPI_API_KEY)")
+    if not (settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET):
+        raise HTTPException(
+            status_code=503,
+            detail="Hotel search is not configured (missing AMADEUS_CLIENT_ID/AMADEUS_CLIENT_SECRET)",
+        )
 
     provider = get_accommodation_provider()
     try:

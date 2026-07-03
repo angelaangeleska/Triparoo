@@ -88,7 +88,7 @@ class TripPlannerService:
             reviews_count=data.get("reviews_count"),
             price_per_night=data.get("price_per_night", 0.0),
             total_price=data.get("total_price", 0.0),
-            currency=data.get("currency", "USD"),
+            currency=data.get("currency", "EUR"),
             family_friendly=data.get("family_friendly", False),
             image_url=data.get("image_url", ""),
             google_url=data.get("google_url", ""),
@@ -96,7 +96,7 @@ class TripPlannerService:
             amenities=data.get("amenities") or [],
             check_in_time=data.get("check_in_time", ""),
             check_out_time=data.get("check_out_time", ""),
-            source=data.get("source", "serpapi"),
+            source=data.get("source", "amadeus"),
         )
 
     async def recommend(self, request: RecommendRequest) -> RecommendResponse:

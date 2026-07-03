@@ -70,7 +70,7 @@ class FlightLegSummary(BaseModel):
     seats_remaining: int
     baggage: str = ""
     direction: str = "outbound"
-    source: str = "serpapi"
+    source: str = "amadeus"
     fare_note: str = ""
 
 
@@ -83,14 +83,14 @@ class FlightSummary(BaseModel):
     outbound: FlightLegSummary
     return_flight: Optional[FlightLegSummary] = None
     alternatives: list[FlightLegSummary] = []
-    source: str = "serpapi"
+    source: str = "amadeus"
 
 
 class BookingSourceSummary(BaseModel):
     name: str
     price_per_night: float
     total_price: float
-    currency: str = "USD"
+    currency: str = "EUR"
     url: str
 
 
@@ -102,7 +102,7 @@ class AccommodationSummary(BaseModel):
     reviews_count: Optional[int] = None
     price_per_night: float
     total_price: float
-    currency: str = "USD"
+    currency: str = "EUR"
     family_friendly: bool = False
     image_url: str = ""
     google_url: str = ""
@@ -110,7 +110,7 @@ class AccommodationSummary(BaseModel):
     amenities: list[str] = []
     check_in_time: str = ""
     check_out_time: str = ""
-    source: str = "serpapi"
+    source: str = "amadeus"
 
 
 class DestinationRecommendation(BaseModel):

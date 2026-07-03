@@ -1,6 +1,6 @@
 """Seed reference catalog data (destinations, attractions, seasons).
 
-Flight and hotel prices are fetched live via SerpAPI/Amadeus — not stored here.
+Flight and hotel prices are fetched live via Amadeus — not stored here.
 """
 
 from __future__ import annotations

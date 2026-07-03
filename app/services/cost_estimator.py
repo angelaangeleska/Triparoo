@@ -133,7 +133,7 @@ class CostEstimatorService:
                     flight_offer_data = build_flight_summary(best_out, party_size, best_return, best_alts)
                 elif origin_iatas and not same_origin:
                     origin_message = (
-                        origin_message or "No live flights found for these dates — check SerpAPI key or try other dates."
+                        origin_message or "No live flights found for these dates — check Amadeus credentials or try other dates."
                     )
 
         accommodation_cost = 0.0

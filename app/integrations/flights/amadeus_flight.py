@@ -8,6 +8,7 @@ from datetime import datetime
 import httpx
 
 from app.core.config import settings
+from app.integrations.amadeus_auth import get_amadeus_access_token, invalidate_amadeus_token
 from app.integrations.flights.airline_names import airline_name
 from app.integrations.flights.base import FlightOffer, FlightSearchCriteria
 from app.services.airport_catalog import get_airport_catalog
@@ -20,28 +21,11 @@ class AmadeusFlightProvider:
 
     def __init__(self, session=None):
         self.session = session
-        self._token: str | None = None
         self.catalog = get_airport_catalog()
 
     @property
     def enabled(self) -> bool:
         return bool(settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET)
-
-    async def _get_token(self, client: httpx.AsyncClient) -> str:
-        if self._token:
-            return self._token
-        resp = await client.post(
-            f"{settings.AMADEUS_BASE_URL}/v1/security/oauth2/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": settings.AMADEUS_CLIENT_ID,
-                "client_secret": settings.AMADEUS_CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        resp.raise_for_status()
-        self._token = resp.json()["access_token"]
-        return self._token
 
     @staticmethod
     def _parse_iso_datetime(value: str) -> datetime:
@@ -177,7 +161,7 @@ class AmadeusFlightProvider:
 
         try:
             async with httpx.AsyncClient(timeout=25.0) as client:
-                token = await self._get_token(client)
+                token = await get_amadeus_access_token(client)
                 params: dict = {
                     "originLocationCode": origin,
                     "destinationLocationCode": dest,
@@ -197,7 +181,7 @@ class AmadeusFlightProvider:
                 )
 
                 if resp.status_code == 401:
-                    self._token = None
+                    invalidate_amadeus_token()
                     logger.error("Amadeus token expired or invalid")
                 elif resp.status_code != 200:
                     logger.warning("Amadeus API error %s: %s", resp.status_code, resp.text[:200])
