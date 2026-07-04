@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { isKid, useFamily } from '../context/FamilyContext'
 import type {
   AccommodationSummary,
   Attraction,
@@ -25,11 +26,10 @@ import type {
   ChildActivity,
   Destination,
   ItineraryDay,
-  TripMember,
 } from '../types'
 import HotelCard from '../components/planner/HotelCard'
 import OriginLocationInput from '../components/planner/OriginLocationInput'
-import { INTEREST_OPTIONS, MONTHS } from '../types'
+import { MONTHS } from '../types'
 import CityImage from '../components/ui/CityImage'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
@@ -37,9 +37,18 @@ import NumericInput from '../components/ui/NumericInput'
 
 type Tab = 'overview' | 'itinerary' | 'activities' | 'dates' | 'budget'
 
+interface KidActivityGroup {
+  memberIndex: number
+  age: number
+  interests: string[]
+  gender?: string
+  activities: ChildActivity[]
+}
+
 export default function DestinationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { isAuthenticated } = useAuth()
+  const { members, kids } = useFamily()
   const navigate = useNavigate()
   const location = useLocation()
   const tripState = location.state as {
@@ -64,12 +73,10 @@ export default function DestinationDetailPage() {
   const [itineraryCost, setItineraryCost] = useState(0)
   const [itineraryLoading, setItineraryLoading] = useState(false)
 
-  // Child activities state
-  const [childAge, setChildAge] = useState(11)
-  const [childInterests, setChildInterests] = useState<string[]>(['disney'])
-  const [childActivities, setChildActivities] = useState<ChildActivity[]>([])
-  const [childActivitiesSearched, setChildActivitiesSearched] = useState(false)
-  const [childActivitiesLoading, setChildActivitiesLoading] = useState(false)
+  // Child activities (loaded from saved family profile)
+  const [kidActivityGroups, setKidActivityGroups] = useState<KidActivityGroup[]>([])
+  const [kidActivitiesLoading, setKidActivitiesLoading] = useState(false)
+  const [kidActivitiesLoaded, setKidActivitiesLoaded] = useState(false)
 
   // Cheapest dates
   const [cheapestPeriods, setCheapestPeriods] = useState<CheapestPeriod[]>([])
@@ -91,6 +98,10 @@ export default function DestinationDetailPage() {
   const [hotelsError, setHotelsError] = useState('')
 
   const destId = parseInt(id || '0')
+  const kidsWithInterests = members
+    .map((member, index) => ({ member, index }))
+    .filter(({ member }) => isKid(member) && member.interests.length > 0)
+
   function localDateOffset(days: number): string {
     const d = new Date()
     d.setDate(d.getDate() + days)
@@ -100,11 +111,13 @@ export default function DestinationDetailPage() {
     return `${y}-${m}-${day}`
   }
 
-  const defaultMembers: TripMember[] = [
-    { age: 35, interests: [] },
-    { age: 33, interests: [] },
-    { age: 11, gender: 'female', interests: ['disney'] },
-  ]
+  const requireAuth = () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return false
+    }
+    return true
+  }
 
   useEffect(() => {
     if (!destId) return
@@ -112,7 +125,6 @@ export default function DestinationDetailPage() {
       .then(([dest, att]) => {
         setDestination(dest)
         setAttractions(att)
-        // Load hotels once we know the city name
         const city = dest.city
         const country = dest.country
         if (!city) return
@@ -133,13 +145,59 @@ export default function DestinationDetailPage() {
       .finally(() => setLoading(false))
   }, [destId])
 
-  const requireAuth = () => {
+  const loadKidActivities = useCallback(async () => {
     if (!isAuthenticated) {
-      navigate('/login')
-      return false
+      setKidActivityGroups([])
+      setKidActivitiesLoaded(true)
+      return
     }
-    return true
-  }
+
+    const kidsToLoad = members
+      .map((member, index) => ({ member, index }))
+      .filter(({ member }) => isKid(member) && member.interests.length > 0)
+
+    if (kidsToLoad.length === 0) {
+      setKidActivityGroups([])
+      setKidActivitiesLoaded(true)
+      return
+    }
+
+    setKidActivitiesLoading(true)
+    setError('')
+    try {
+      const results = await Promise.all(
+        kidsToLoad.map(async ({ member, index }) => {
+          const res = await api.childActivities({
+            destination_id: destId,
+            age: member.age,
+            gender: member.gender,
+            interests: member.interests,
+          })
+          return {
+            memberIndex: index,
+            age: member.age,
+            interests: member.interests,
+            gender: member.gender,
+            activities: res.activities,
+          }
+        }),
+      )
+      setKidActivityGroups(results)
+    } catch (err) {
+      setKidActivityGroups([])
+      setError(err instanceof ApiError ? err.message : 'Failed to load activities')
+    } finally {
+      setKidActivitiesLoading(false)
+      setKidActivitiesLoaded(true)
+    }
+  }, [destId, isAuthenticated, members])
+
+  useEffect(() => {
+    if (tab === 'activities' && destId) {
+      setKidActivitiesLoaded(false)
+      loadKidActivities()
+    }
+  }, [tab, destId, loadKidActivities, members])
 
   const generateItinerary = async () => {
     if (!requireAuth()) return
@@ -148,7 +206,7 @@ export default function DestinationDetailPage() {
     try {
       const res = await api.itinerary({
         destination_id: destId,
-        members: defaultMembers,
+        members,
         duration_days: duration,
         budget: itineraryBudget,
       })
@@ -158,27 +216,6 @@ export default function DestinationDetailPage() {
       setError(err instanceof ApiError ? err.message : 'Failed to generate itinerary')
     } finally {
       setItineraryLoading(false)
-    }
-  }
-
-  const loadChildActivities = async () => {
-    if (!requireAuth()) return
-    if (childInterests.length === 0) return
-    setError('')
-    setChildActivitiesLoading(true)
-    setChildActivitiesSearched(true)
-    try {
-      const res = await api.childActivities({
-        destination_id: destId,
-        age: childAge,
-        interests: childInterests,
-      })
-      setChildActivities(res.activities)
-    } catch (err) {
-      setChildActivities([])
-      setError(err instanceof ApiError ? err.message : 'Failed to load activities')
-    } finally {
-      setChildActivitiesLoading(false)
     }
   }
 
@@ -214,7 +251,7 @@ export default function DestinationDetailPage() {
       const res = await api.budgetOptimize({
         destination_id: destId,
         origin_location: datesOrigin.trim() || tripState?.originLocation || undefined,
-        members: defaultMembers,
+        members,
         budget: tripState?.budget ?? itineraryBudget,
         start_date: tripState?.startDate || localDateOffset(30),
         end_date: tripState?.endDate || localDateOffset(37),
@@ -423,72 +460,100 @@ export default function DestinationDetailPage() {
         {/* Child activities */}
         {tab === 'activities' && (
           <FadeIn>
-            <div className="glass rounded-2xl p-6 mb-8 max-w-lg">
-              <h2 className="font-semibold text-brand-900 mb-4 flex items-center gap-2">
-                <Baby className="w-5 h-5 text-brand-500" />
-                Find activities for your child
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-brand-900 flex items-center gap-2">
+                <Baby className="w-6 h-6 text-brand-500" />
+                Activities for your kids
               </h2>
-              <div className="mb-4">
-                <label className="text-sm text-brand-600 mb-1 block">Child's age</label>
-                <NumericInput integer value={childAge} onChange={setChildAge} min={0} max={17}
-                  className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white" />
-              </div>
-              <div className="mb-4">
-                <label className="text-xs text-brand-500 font-medium mb-2 block">
-                  Interests {childInterests.length > 0 && <span className="text-brand-400">({childInterests.length} selected)</span>}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {INTEREST_OPTIONS.map((interest) => (
-                    <button key={interest} onClick={() => {
-                      setChildActivities([])
-                      setChildActivitiesSearched(false)
-                      setChildInterests(
-                        childInterests.includes(interest)
-                          ? childInterests.filter(x => x !== interest)
-                          : [...childInterests, interest]
-                      )
-                    }} className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      childInterests.includes(interest) ? 'bg-brand-500 text-white' : 'bg-brand-100 text-brand-700'
-                    }`}>
-                      {interest.replace('_', ' ')}
-                    </button>
-                  ))}
-                </div>
-                {childInterests.length === 0 && (
-                  <p className="text-xs text-brand-500 mt-2">Select at least one interest to filter activities.</p>
+              <p className="text-sm text-brand-600 mt-1">
+                Based on your saved family profile
+                {!isAuthenticated && (
+                  <> · <Link to="/login" className="text-brand-700 font-medium hover:underline">Sign in</Link> to see personalized picks</>
                 )}
-              </div>
-              <button onClick={loadChildActivities} disabled={childInterests.length === 0 || childActivitiesLoading}
-                className="w-full py-3 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                {childActivitiesLoading ? 'Searching...' : 'Find matching activities'}
-              </button>
+              </p>
             </div>
 
-            {childActivitiesLoading && <LoadingSpinner message="Finding activities..." />}
-
-            {childActivitiesSearched && !childActivitiesLoading && childActivities.length === 0 && (
-              <p className="text-sm text-brand-600 text-center py-8 glass rounded-xl">
-                No activities match {childInterests.map((i) => i.replace('_', ' ')).join(', ')} for this destination.
-                Try another interest or age.
-              </p>
+            {kids.length === 0 && (
+              <div className="glass rounded-2xl p-6 text-center">
+                <p className="text-brand-600 mb-3">No kids under 18 in your family profile.</p>
+                <Link to="/family" className="text-brand-700 font-semibold hover:underline">
+                  Update your family profile →
+                </Link>
+              </div>
             )}
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              {childActivities.map((a) => (
-                <div key={a.id} className="glass rounded-xl p-5">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-brand-900">{a.name}</h3>
-                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-brand-500/10 text-brand-700">
-                      {a.match_score.toFixed(0)}% match
-                    </span>
+            {kids.length > 0 && kidsWithInterests.length === 0 && (
+              <div className="glass rounded-2xl p-6 text-center">
+                <p className="text-brand-600 mb-3">
+                  Add interests for your kids so we can suggest matching activities here.
+                </p>
+                <Link
+                  to="/family"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600"
+                >
+                  Set up kid interests
+                </Link>
+              </div>
+            )}
+
+            {kidActivitiesLoading && <LoadingSpinner message="Finding activities for your kids..." />}
+
+            {!kidActivitiesLoading && kidActivitiesLoaded && kidActivityGroups.length > 0 && (
+              <div className="space-y-8">
+                {kidActivityGroups.map((group) => (
+                  <div key={group.memberIndex}>
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-700 text-sm font-semibold">
+                        Age {group.age}
+                      </span>
+                      {group.interests.map((interest) => (
+                        <span
+                          key={interest}
+                          className="px-2.5 py-0.5 rounded-md bg-sand-100 text-brand-700 text-xs font-medium capitalize"
+                        >
+                          {interest.replace('_', ' ')}
+                        </span>
+                      ))}
+                    </div>
+
+                    {group.activities.length === 0 ? (
+                      <p className="text-sm text-brand-600 glass rounded-xl px-4 py-6 text-center">
+                        No activities match these interests for {destination.city}. Try different interests in your{' '}
+                        <Link to="/family" className="text-brand-700 font-medium hover:underline">family profile</Link>.
+                      </p>
+                    ) : (
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        {group.activities.map((a) => (
+                          <div key={a.id} className="glass rounded-xl p-5">
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="font-semibold text-brand-900">{a.name}</h3>
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-brand-500/10 text-brand-700">
+                                {a.match_score.toFixed(0)}% match
+                              </span>
+                            </div>
+                            <p className="text-xs text-brand-500 mb-2">{a.category}</p>
+                            {a.description && <p className="text-sm text-brand-600 mb-2">{a.description}</p>}
+                            <p className="text-xs text-brand-500 italic">{a.reason}</p>
+                            <p className="text-sm font-semibold text-brand-700 mt-2">
+                              {a.price === 0 ? 'Free' : `€${a.price}`}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-brand-500 mb-2">{a.category}</p>
-                  {a.description && <p className="text-sm text-brand-600 mb-2">{a.description}</p>}
-                  <p className="text-xs text-brand-500 italic">{a.reason}</p>
-                  <p className="text-sm font-semibold text-brand-700 mt-2">{a.price === 0 ? 'Free' : `€${a.price}`}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+
+            {!kidActivitiesLoading && kidActivitiesLoaded && kidActivityGroups.length > 0 && (
+              <p className="text-xs text-brand-500 mt-6 text-center">
+                <Link to="/family" className="text-brand-600 font-medium hover:underline">
+                  Edit family profile
+                </Link>{' '}
+                to update ages or interests
+              </p>
+            )}
           </FadeIn>
         )}
 

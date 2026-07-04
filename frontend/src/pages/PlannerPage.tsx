@@ -1,37 +1,29 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import {
-  Baby,
   Calendar,
   Euro,
-  Minus,
+  Pencil,
   Plane,
-  Plus,
   Search,
   Sparkles,
-  Trash2,
-  User,
+  Users,
 } from 'lucide-react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import type { DestinationRecommendation, TripMember } from '../types'
-import { INTEREST_OPTIONS, MONTHS } from '../types'
+import { isKid, useFamily } from '../context/FamilyContext'
+import type { DestinationRecommendation } from '../types'
+import { MONTHS } from '../types'
 import RecommendationCard from '../components/planner/RecommendationCard'
 import OriginLocationInput from '../components/planner/OriginLocationInput'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
 import NumericInput from '../components/ui/NumericInput'
 
-const defaultMembers: TripMember[] = [
-  { age: 35, interests: [] },
-  { age: 33, interests: [] },
-  { age: 11, gender: 'female', interests: ['disney', 'science'] },
-]
-
 export default function PlannerPage() {
   const { isAuthenticated, loading: authLoading } = useAuth()
+  const { members, kids } = useFamily()
 
-  const [members, setMembers] = useState<TripMember[]>(defaultMembers)
   const [budget, setBudget] = useState(1500)
   const [preferredMonth, setPreferredMonth] = useState(8)
   const [startDate, setStartDate] = useState('')
@@ -42,20 +34,6 @@ export default function PlannerPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
-
-  const addMember = () => setMembers([...members, { age: 30, interests: [] }])
-  const removeMember = (i: number) => setMembers(members.filter((_, idx) => idx !== i))
-  const updateMember = (i: number, field: keyof TripMember, value: string | number | string[]) => {
-    setMembers(members.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)))
-  }
-
-  const toggleInterest = (memberIdx: number, interest: string) => {
-    const current = members[memberIdx].interests
-    const next = current.includes(interest)
-      ? current.filter((x) => x !== interest)
-      : [...current, interest]
-    updateMember(memberIdx, 'interests', next)
-  }
 
   const handleSearch = async () => {
     setError('')
@@ -94,109 +72,56 @@ export default function PlannerPage() {
             Plan your family trip
           </h1>
           <p className="text-brand-600 text-lg max-w-xl mx-auto">
-            Tell us about your family and we'll find the perfect destinations ranked by our hybrid recommendation engine.
+            Set your budget and travel dates — we&apos;ll rank destinations using your saved family profile.
           </p>
         </div>
       </FadeIn>
 
       <FadeIn delay={0.1}>
         <div className="glass rounded-3xl shadow-card p-6 sm:p-8 mb-10">
-          {/* Family members */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="mb-8 p-4 rounded-2xl bg-white/60 border border-brand-100">
+            <div className="flex items-start justify-between gap-4 mb-3">
               <h2 className="font-semibold text-brand-900 flex items-center gap-2">
-                <User className="w-5 h-5 text-brand-500" />
-                Family members
+                <Users className="w-5 h-5 text-brand-500" />
+                Your family
               </h2>
-              <button
-                onClick={addMember}
-                className="flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-800 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              <Link
+                to="/family"
+                className="flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-800 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors shrink-0"
               >
-                <Plus className="w-4 h-4" />
-                Add member
-              </button>
+                <Pencil className="w-4 h-4" />
+                Edit profile
+              </Link>
             </div>
-
-            <div className="space-y-4">
+            <p className="text-sm text-brand-600 mb-3">
+              {members.length} traveler{members.length !== 1 ? 's' : ''}
+              {kids.length > 0 && ` · ${kids.length} kid${kids.length !== 1 ? 's' : ''} under 18`}
+            </p>
+            <div className="flex flex-wrap gap-2">
               {members.map((member, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-white/60 border border-brand-100">
-                  <div className="flex items-start gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Baby className="w-4 h-4 text-brand-400" />
-                      <label className="text-sm text-brand-600">Age</label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateMember(i, 'age', Math.max(0, member.age - 1))}
-                          className="w-8 h-8 rounded-lg bg-brand-100 hover:bg-brand-200 flex items-center justify-center"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <NumericInput
-                          integer
-                          value={member.age}
-                          onChange={(age) => updateMember(i, 'age', age)}
-                          className="w-16 text-center py-1.5 rounded-lg border border-brand-200 bg-white font-semibold"
-                          min={0}
-                          max={120}
-                        />
-                        <button
-                          onClick={() => updateMember(i, 'age', member.age + 1)}
-                          className="w-8 h-8 rounded-lg bg-brand-100 hover:bg-brand-200 flex items-center justify-center"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-brand-600 block mb-1">Gender (optional)</label>
-                      <select
-                        value={member.gender || ''}
-                        onChange={(e) => updateMember(i, 'gender', e.target.value || '')}
-                        className="px-3 py-1.5 rounded-lg border border-brand-200 bg-white text-sm"
-                      >
-                        <option value="">—</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                      </select>
-                    </div>
-
-                    {members.length > 1 && (
-                      <button
-                        onClick={() => removeMember(i)}
-                        className="ml-auto p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {member.age < 18 && (
-                    <div className="mt-3">
-                      <label className="text-xs text-brand-500 font-medium mb-2 block">Interests</label>
-                      <div className="flex flex-wrap gap-2">
-                        {INTEREST_OPTIONS.map((interest) => (
-                          <button
-                            key={interest}
-                            onClick={() => toggleInterest(i, interest)}
-                            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                              member.interests.includes(interest)
-                                ? 'bg-brand-500 text-white'
-                                : 'bg-brand-100 text-brand-700 hover:bg-brand-200'
-                            }`}
-                          >
-                            {interest.replace('_', ' ')}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 text-brand-800 text-xs font-medium border border-brand-100"
+                >
+                  Age {member.age}
+                  {isKid(member) && member.interests.length > 0 && (
+                    <span className="text-brand-500">
+                      · {member.interests.map((x) => x.replace('_', ' ')).join(', ')}
+                    </span>
                   )}
-                </div>
+                </span>
               ))}
             </div>
+            {kids.some((k) => k.interests.length === 0) && (
+              <p className="text-xs text-brand-500 mt-3">
+                <Link to="/family" className="text-brand-600 font-medium hover:underline">
+                  Add interests for your kids
+                </Link>{' '}
+                to get personalized activity suggestions on destination pages.
+              </p>
+            )}
           </div>
 
-          {/* Budget & dates */}
           <div className="grid sm:grid-cols-2 gap-6 mb-8">
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-brand-700 mb-2">

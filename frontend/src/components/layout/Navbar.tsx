@@ -1,10 +1,11 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { Compass, LogOut, MapPin, Menu, Sparkles, User, X } from 'lucide-react'
+import { Compass, LogOut, MapPin, Menu, Sparkles, User, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
 const navLinks = [
   { to: '/destinations', label: 'Destinations', icon: MapPin },
+  { to: '/family', label: 'My Family', icon: Users },
   { to: '/planner', label: 'Plan Trip', icon: Sparkles },
 ]
 

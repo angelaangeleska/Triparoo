@@ -12,9 +12,31 @@ const FACTORS: { key: keyof ScoreBreakdown; label: string; color: string }[] = [
 
 interface Props {
   breakdown: ScoreBreakdown
+  compact?: boolean
 }
 
-export default function ScoreBreakdownChart({ breakdown }: Props) {
+export default function ScoreBreakdownChart({ breakdown, compact = false }: Props) {
+  if (compact) {
+    return (
+      <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2">
+        {FACTORS.map(({ key, label, color }) => (
+          <div key={key} className="flex items-center gap-2 min-w-0">
+            <span className="text-xs text-brand-600 font-medium w-24 shrink-0 truncate">{label}</span>
+            <div className="flex-1 h-1.5 bg-brand-100 rounded-full overflow-hidden min-w-0">
+              <div
+                className={`h-full rounded-full ${color}`}
+                style={{ width: `${Math.min(breakdown[key], 100)}%` }}
+              />
+            </div>
+            <span className="text-xs text-brand-800 font-semibold w-6 text-right shrink-0">
+              {breakdown[key].toFixed(0)}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       {FACTORS.map(({ key, label, color }) => (

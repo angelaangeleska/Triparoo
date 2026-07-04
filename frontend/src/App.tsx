@@ -1,11 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { FamilyProvider } from './context/FamilyContext'
 import Layout from './components/layout/Layout'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import PlannerPage from './pages/PlannerPage'
+import FamilyPage from './pages/FamilyPage'
 import DestinationsPage from './pages/DestinationsPage'
 import DestinationDetailPage from './pages/DestinationDetailPage'
 import ChatAssistant from './components/chat/ChatAssistant'
@@ -14,6 +16,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <FamilyProvider>
         <ErrorBoundary>
           <Routes>
             <Route element={<Layout />}>
@@ -21,6 +24,7 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/planner" element={<PlannerPage />} />
+              <Route path="/family" element={<FamilyPage />} />
               <Route path="/destinations" element={<DestinationsPage />} />
               <Route path="/destinations/:id" element={<DestinationDetailPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -28,6 +32,7 @@ export default function App() {
           </Routes>
           <ChatAssistant />
         </ErrorBoundary>
+        </FamilyProvider>
       </AuthProvider>
     </BrowserRouter>
   )
