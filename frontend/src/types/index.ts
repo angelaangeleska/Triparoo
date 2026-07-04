@@ -20,6 +20,24 @@ export interface TripMember {
   interests: string[]
 }
 
+export interface FamilyMember {
+  id: number
+  user_id: number
+  age: number
+  gender?: string
+  interests: string[]
+  name?: string
+  relation_type?: string
+}
+
+export interface FamilyMemberInput {
+  age: number
+  gender?: string
+  interests: string[]
+  name?: string
+  relation_type?: string
+}
+
 export interface Destination {
   id: number
   city_id: number
@@ -173,6 +191,7 @@ export interface DestinationRecommendation {
   accommodation?: AccommodationSummary | null
   score_breakdown: ScoreBreakdown
   explanation: string
+  highlights: string[]
   suggested_attractions: {
     id: number
     name: string
@@ -186,6 +205,7 @@ export interface DestinationRecommendation {
 export interface ItineraryDay {
   day_number: number
   title: string
+  narrative?: string | null
   items: {
     time: string
     activity: string
@@ -219,6 +239,24 @@ export interface BudgetAlternative {
   description: string
   estimated_savings: number
   new_total: number
+}
+
+export interface AIGuideItem {
+  title: string
+  description: string
+  why_recommended: string
+}
+
+export interface AITripGuide {
+  destination_id: number
+  city: string
+  country: string
+  available: boolean
+  attractions: AIGuideItem[]
+  restaurants: AIGuideItem[]
+  hidden_gems: AIGuideItem[]
+  local_tips: AIGuideItem[]
+  transportation_tips: AIGuideItem[]
 }
 
 export const MONTHS = [

@@ -22,7 +22,7 @@ export default function HotelCard({ hotel }: Props) {
   const showImage = Boolean(hotel.image_url) && !imageFailed
 
   return (
-    <div className="rounded-xl border border-brand-100 bg-white/80 overflow-hidden">
+    <div className="rounded-xl border border-brand-100 dark:border-brand-700 bg-white/80 dark:bg-brand-900/60 overflow-hidden">
       <div className="flex gap-0 min-h-[7rem]">
         <div className="w-28 shrink-0 relative bg-brand-50">
           {showImage ? (
@@ -46,8 +46,8 @@ export default function HotelCard({ hotel }: Props) {
         <div className="flex-1 p-3 min-w-0 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="font-semibold text-brand-900 text-sm truncate">{hotel.name}</p>
-              <p className="text-xs text-brand-500">
+              <p className="font-semibold text-brand-900 dark:text-white text-sm truncate">{hotel.name}</p>
+              <p className="text-xs text-brand-500 dark:text-brand-400">
                 {hotel.hotel_class || hotel.type}
                 {hotel.rating && (
                   <span className="ml-2 inline-flex items-center gap-0.5 text-amber-600">
@@ -61,17 +61,17 @@ export default function HotelCard({ hotel }: Props) {
               </p>
             </div>
             <div className="text-right shrink-0">
-              <p className="font-bold text-brand-900 text-sm">
+              <p className="font-bold text-brand-900 dark:text-white text-sm">
                 {formatMoney(hotel.price_per_night, hotel.currency)}
               </p>
-              <p className="text-xs text-brand-500">/ night</p>
+              <p className="text-xs text-brand-500 dark:text-brand-400">/ night</p>
             </div>
           </div>
 
           {hotel.amenities.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {hotel.amenities.slice(0, 4).map((a) => (
-                <span key={a} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-100">
+                <span key={a} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-800 text-brand-600 dark:text-brand-300 border border-brand-100 dark:border-brand-700">
                   <Wifi className="w-2.5 h-2.5" />
                   {a}
                 </span>

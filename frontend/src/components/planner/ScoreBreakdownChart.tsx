@@ -20,10 +20,10 @@ export default function ScoreBreakdownChart({ breakdown }: Props) {
       {FACTORS.map(({ key, label, color }) => (
         <div key={key}>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-brand-600 font-medium">{label}</span>
-            <span className="text-brand-800 font-semibold">{breakdown[key].toFixed(0)}</span>
+            <span className="text-brand-600 dark:text-brand-300 font-medium">{label}</span>
+            <span className="text-brand-800 dark:text-brand-100 font-semibold">{breakdown[key].toFixed(0)}</span>
           </div>
-          <div className="h-2 bg-brand-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-brand-100 dark:bg-brand-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${color} transition-all duration-700`}
               style={{ width: `${Math.min(breakdown[key], 100)}%` }}

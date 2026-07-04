@@ -1,36 +1,49 @@
-import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { Baby, Euro, Link as LinkIcon, Plane, Plus, Search, Sparkles, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ApiError } from '../api/client'
 import {
-  Baby,
-  Calendar,
-  Euro,
-  Minus,
-  Plane,
-  Plus,
-  Search,
-  Sparkles,
-  Trash2,
-  User,
-} from 'lucide-react'
-import { api, ApiError } from '../api/client'
-import { useAuth } from '../context/AuthContext'
-import type { DestinationRecommendation, TripMember } from '../types'
-import { INTEREST_OPTIONS, MONTHS } from '../types'
+  toTripMember,
+  useCreateFamilyMember,
+  useDeleteFamilyMember,
+  useFamilyMembers,
+  useRecommend,
+  useUpdateFamilyMember,
+} from '../api/hooks'
+import type { DestinationRecommendation, FamilyMemberInput } from '../types'
+import { MONTHS } from '../types'
 import RecommendationCard from '../components/planner/RecommendationCard'
 import OriginLocationInput from '../components/planner/OriginLocationInput'
+import FamilyMemberForm from '../components/family/FamilyMemberForm'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Label } from '../components/ui/Label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/Select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog'
+import { Skeleton } from '../components/ui/Skeleton'
 
-const defaultMembers: TripMember[] = [
-  { age: 35, interests: [] },
-  { age: 33, interests: [] },
-  { age: 11, gender: 'female', interests: ['disney', 'science'] },
-]
+interface EditableMember extends FamilyMemberInput {
+  id?: number
+}
 
 export default function PlannerPage() {
-  const { isAuthenticated, loading: authLoading } = useAuth()
+  const { t } = useTranslation()
+  const familyQuery = useFamilyMembers()
+  const createMember = useCreateFamilyMember()
+  const updateMember = useUpdateFamilyMember()
+  const deleteMember = useDeleteFamilyMember()
+  const recommendMutation = useRecommend()
 
-  const [members, setMembers] = useState<TripMember[]>(defaultMembers)
+  const [members, setMembers] = useState<EditableMember[]>([])
+  const [initialized, setInitialized] = useState(false)
+  const [pendingDeletes, setPendingDeletes] = useState<number[]>([])
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+
   const [budget, setBudget] = useState(1500)
   const [preferredMonth, setPreferredMonth] = useState(8)
   const [startDate, setStartDate] = useState('')
@@ -38,31 +51,86 @@ export default function PlannerPage() {
   const [originLocation, setOriginLocation] = useState('')
   const [recommendations, setRecommendations] = useState<DestinationRecommendation[]>([])
   const [originMessage, setOriginMessage] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
 
-  const addMember = () => setMembers([...members, { age: 30, interests: [] }])
-  const removeMember = (i: number) => setMembers(members.filter((_, idx) => idx !== i))
-  const updateMember = (i: number, field: keyof TripMember, value: string | number | string[]) => {
-    setMembers(members.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)))
+  useEffect(() => {
+    if (!initialized && familyQuery.data) {
+      setMembers(
+        familyQuery.data.map((m) => ({
+          id: m.id,
+          age: m.age,
+          gender: m.gender,
+          interests: m.interests,
+          name: m.name,
+          relation_type: m.relation_type,
+        }))
+      )
+      setInitialized(true)
+    }
+  }, [familyQuery.data, initialized])
+
+  const openAddMember = () => {
+    setEditingIndex(null)
+    setDialogOpen(true)
   }
 
-  const toggleInterest = (memberIdx: number, interest: string) => {
-    const current = members[memberIdx].interests
-    const next = current.includes(interest)
-      ? current.filter((x) => x !== interest)
-      : [...current, interest]
-    updateMember(memberIdx, 'interests', next)
+  const openEditMember = (index: number) => {
+    setEditingIndex(index)
+    setDialogOpen(true)
+  }
+
+  const removeMember = (index: number) => {
+    const member = members[index]
+    if (member.id) setPendingDeletes((prev) => [...prev, member.id!])
+    setMembers((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleMemberFormSubmit = (data: FamilyMemberInput) => {
+    if (editingIndex === null) {
+      setMembers((prev) => [...prev, data])
+    } else {
+      setMembers((prev) => prev.map((m, i) => (i === editingIndex ? { ...data, id: m.id } : m)))
+    }
+    setDialogOpen(false)
+  }
+
+  /** Persists local add/edit/remove changes back to the saved family profile before searching. */
+  const syncFamily = async (): Promise<EditableMember[]> => {
+    await Promise.all(pendingDeletes.map((id) => deleteMember.mutateAsync(id)))
+    setPendingDeletes([])
+
+    return Promise.all(
+      members.map(async (m) => {
+        const payload: FamilyMemberInput = {
+          age: m.age,
+          gender: m.gender,
+          interests: m.interests,
+          name: m.name,
+          relation_type: m.relation_type,
+        }
+        if (m.id) {
+          await updateMember.mutateAsync({ id: m.id, data: payload })
+          return m
+        }
+        const created = await createMember.mutateAsync(payload)
+        return { ...m, id: created.id }
+      })
+    )
   }
 
   const handleSearch = async () => {
+    if (members.length === 0) {
+      toast.error(t('planner.noSavedFamily'))
+      return
+    }
     setError('')
-    setLoading(true)
     setSearched(true)
     try {
-      const res = await api.recommend({
-        members,
+      const synced = await syncFamily()
+      setMembers(synced)
+      const res = await recommendMutation.mutateAsync({
+        members: synced.map(toTripMember),
         budget,
         preferred_month: preferredMonth,
         start_date: startDate || undefined,
@@ -72,216 +140,181 @@ export default function PlannerPage() {
       setRecommendations(res.recommendations)
       setOriginMessage(res.origin_message || '')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Search failed')
-    } finally {
-      setLoading(false)
+      const message = err instanceof ApiError ? err.message : 'Search failed'
+      setError(message)
+      toast.error(message)
     }
   }
 
-  if (authLoading) return <LoadingSpinner fullScreen message="Loading..." />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  const familyLoading = familyQuery.isLoading
+  const loading = recommendMutation.isPending
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <FadeIn>
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-500/10 text-brand-700 text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-500/10 dark:bg-brand-400/10 text-brand-700 dark:text-brand-200 text-sm font-medium mb-4">
             <Sparkles className="w-4 h-4" />
-            AI-Powered Recommendations
+            {t('planner.badge')}
           </div>
-          <h1 className="font-display text-4xl sm:text-5xl font-bold text-brand-900 mb-3">
-            Plan your family trip
+          <h1 className="font-display text-4xl sm:text-5xl font-bold text-brand-900 dark:text-white mb-3">
+            {t('planner.title')}
           </h1>
-          <p className="text-brand-600 text-lg max-w-xl mx-auto">
-            Tell us about your family and we'll find the perfect destinations ranked by our hybrid recommendation engine.
-          </p>
+          <p className="text-brand-600 dark:text-brand-300 text-lg max-w-xl mx-auto">{t('planner.subtitle')}</p>
         </div>
       </FadeIn>
 
       <FadeIn delay={0.1}>
-        <div className="glass rounded-3xl shadow-card p-6 sm:p-8 mb-10">
+        <div className="glass dark:bg-brand-900/50 dark:border-brand-800 rounded-3xl shadow-card p-6 sm:p-8 mb-10">
           {/* Family members */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-brand-900 flex items-center gap-2">
+              <h2 className="font-semibold text-brand-900 dark:text-white flex items-center gap-2">
                 <User className="w-5 h-5 text-brand-500" />
-                Family members
+                {t('planner.familyMembers')}
               </h2>
-              <button
-                onClick={addMember}
-                className="flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-800 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={openAddMember}>
                 <Plus className="w-4 h-4" />
-                Add member
-              </button>
+                {t('planner.addMember')}
+              </Button>
             </div>
 
-            <div className="space-y-4">
-              {members.map((member, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-white/60 border border-brand-100">
-                  <div className="flex items-start gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Baby className="w-4 h-4 text-brand-400" />
-                      <label className="text-sm text-brand-600">Age</label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateMember(i, 'age', Math.max(0, member.age - 1))}
-                          className="w-8 h-8 rounded-lg bg-brand-100 hover:bg-brand-200 flex items-center justify-center"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <input
-                          type="number"
-                          value={member.age}
-                          onChange={(e) => updateMember(i, 'age', parseInt(e.target.value) || 0)}
-                          className="w-16 text-center py-1.5 rounded-lg border border-brand-200 bg-white font-semibold"
-                          min={0}
-                          max={120}
-                        />
-                        <button
-                          onClick={() => updateMember(i, 'age', member.age + 1)}
-                          className="w-8 h-8 rounded-lg bg-brand-100 hover:bg-brand-200 flex items-center justify-center"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
+            {familyLoading && (
+              <div className="space-y-3">
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+              </div>
+            )}
+
+            {!familyLoading && members.length === 0 && (
+              <p className="text-sm text-brand-500 dark:text-brand-400 bg-brand-50 dark:bg-brand-800/40 rounded-xl px-4 py-3">
+                {t('planner.noSavedFamily')}{' '}
+                <Link
+                  to="/family"
+                  className="font-semibold text-brand-700 dark:text-brand-200 underline underline-offset-2"
+                >
+                  <LinkIcon className="w-3 h-3 inline -mt-0.5 mr-0.5" />
+                  {t('planner.familyPageLink')}
+                </Link>
+                .
+              </p>
+            )}
+
+            {!familyLoading && members.length > 0 && (
+              <div className="space-y-3">
+                {members.map((member, i) => (
+                  <div
+                    key={member.id ?? `new-${i}`}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/60 dark:bg-brand-800/40 border border-brand-100 dark:border-brand-700 hover:border-brand-300 dark:hover:border-brand-500 transition-colors"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openEditMember(i)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    >
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                          member.age < 18
+                            ? 'bg-sunset-500/15 text-sunset-600'
+                            : 'bg-brand-500/15 text-brand-600 dark:text-brand-300'
+                        }`}
+                      >
+                        {member.age < 18 ? <Baby className="w-4 h-4" /> : <User className="w-4 h-4" />}
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-brand-600 block mb-1">Gender (optional)</label>
-                      <select
-                        value={member.gender || ''}
-                        onChange={(e) => updateMember(i, 'gender', e.target.value || '')}
-                        className="px-3 py-1.5 rounded-lg border border-brand-200 bg-white text-sm"
-                      >
-                        <option value="">—</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                      </select>
-                    </div>
-
-                    {members.length > 1 && (
-                      <button
-                        onClick={() => removeMember(i)}
-                        className="ml-auto p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-brand-900 dark:text-white truncate">
+                          {member.name || `${member.age} ${t('common.years')}`}
+                        </p>
+                        {member.interests.length > 0 && (
+                          <p className="text-xs text-brand-500 dark:text-brand-400 truncate">
+                            {member.interests.map((i2) => t(`interests.${i2}`)).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeMember(i)}
+                      className="text-xs font-medium text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0"
+                    >
+                      {t('planner.removeMember')}
+                    </button>
                   </div>
-
-                  {member.age < 18 && (
-                    <div className="mt-3">
-                      <label className="text-xs text-brand-500 font-medium mb-2 block">Interests</label>
-                      <div className="flex flex-wrap gap-2">
-                        {INTEREST_OPTIONS.map((interest) => (
-                          <button
-                            key={interest}
-                            onClick={() => toggleInterest(i, interest)}
-                            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                              member.interests.includes(interest)
-                                ? 'bg-brand-500 text-white'
-                                : 'bg-brand-100 text-brand-700 hover:bg-brand-200'
-                            }`}
-                          >
-                            {interest.replace('_', ' ')}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Budget & dates */}
           <div className="grid sm:grid-cols-2 gap-6 mb-8">
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-brand-700 mb-2">
+              <Label className="flex items-center gap-2">
                 <Euro className="w-4 h-4" />
-                Budget (EUR)
-              </label>
-              <input
+                {t('planner.budget')}
+              </Label>
+              <Input
                 type="number"
                 value={budget}
                 onChange={(e) => setBudget(parseFloat(e.target.value) || 0)}
                 min={100}
-                className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400 font-semibold text-lg"
+                className="font-semibold text-lg"
               />
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-brand-700 mb-2">
-                <Calendar className="w-4 h-4" />
-                Preferred month
-              </label>
-              <select
-                value={preferredMonth}
-                onChange={(e) => setPreferredMonth(parseInt(e.target.value))}
-                className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400"
-              >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i + 1}>{m}</option>
-                ))}
-              </select>
+              <Label>{t('planner.preferredMonth')}</Label>
+              <Select value={String(preferredMonth)} onValueChange={(v) => setPreferredMonth(parseInt(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={m} value={String(i + 1)}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-brand-700 mb-2 block">Start date (optional)</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400"
-              />
+              <Label>{t('planner.startDate')}</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-brand-700 mb-2 block">End date (optional)</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400"
-              />
+              <Label>{t('planner.endDate')}</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-brand-700 mb-2">
+              <Label className="flex items-center gap-2">
                 <Plane className="w-4 h-4" />
-                Departing from (city, country, or city + country)
-              </label>
-              <OriginLocationInput
-                value={originLocation}
-                onChange={setOriginLocation}
-              />
+                {t('planner.departingFrom')}
+              </Label>
+              <OriginLocationInput value={originLocation} onChange={setOriginLocation} />
             </div>
           </div>
 
           {error && (
-            <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-sm">
               {error}
             </div>
           )}
 
-          <button
-            onClick={handleSearch}
-            disabled={loading || budget <= 0}
-            className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold rounded-2xl hover:from-brand-600 hover:to-brand-700 disabled:opacity-60 transition-all shadow-soft text-lg"
-          >
+          <Button size="lg" className="w-full" onClick={handleSearch} disabled={loading || budget <= 0}>
             <Search className="w-5 h-5" />
-            {loading ? 'Finding destinations...' : 'Get recommendations'}
-          </button>
+            {loading ? t('planner.finding') : t('planner.getRecommendations')}
+          </Button>
         </div>
       </FadeIn>
 
-      {loading && <LoadingSpinner message="Analyzing destinations for your family..." />}
+      {loading && <LoadingSpinner message={t('planner.analyzing')} />}
 
       {!loading && searched && recommendations.length === 0 && !error && (
         <FadeIn>
-          <div className="text-center py-16 glass rounded-2xl">
-            <p className="text-brand-600">No destinations found matching your criteria. Try increasing your budget.</p>
+          <div className="text-center py-16 glass dark:bg-brand-900/50 rounded-2xl">
+            <p className="text-brand-600 dark:text-brand-300">{t('planner.noResults')}</p>
           </div>
         </FadeIn>
       )}
@@ -289,11 +322,11 @@ export default function PlannerPage() {
       {!loading && recommendations.length > 0 && (
         <div className="space-y-6">
           <FadeIn>
-            <h2 className="font-display text-2xl font-bold text-brand-900">
-              Top {recommendations.length} destinations for your family
+            <h2 className="font-display text-2xl font-bold text-brand-900 dark:text-white">
+              {t('planner.topDestinations', { count: recommendations.length })}
             </h2>
             {originMessage && (
-              <p className="text-brand-600 text-sm mt-2 flex items-center gap-2">
+              <p className="text-brand-600 dark:text-brand-300 text-sm mt-2 flex items-center gap-2">
                 <Plane className="w-4 h-4" />
                 {originMessage}
               </p>
@@ -313,6 +346,19 @@ export default function PlannerPage() {
           ))}
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingIndex === null ? t('family.addMember') : t('family.editMember')}</DialogTitle>
+          </DialogHeader>
+          <FamilyMemberForm
+            defaultValues={editingIndex !== null ? members[editingIndex] : undefined}
+            onSubmit={handleMemberFormSubmit}
+            onCancel={() => setDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

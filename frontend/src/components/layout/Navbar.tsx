@@ -1,17 +1,31 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { Compass, LogOut, MapPin, Menu, Sparkles, User, X } from 'lucide-react'
+import { Compass, LogOut, MapPin, Menu, Sparkles, User, Users } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../context/AuthContext'
-
-const navLinks = [
-  { to: '/destinations', label: 'Destinations', icon: MapPin },
-  { to: '/planner', label: 'Plan Trip', icon: Sparkles },
-]
+import { Button } from '../ui/Button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/DropdownMenu'
+import { Sheet, SheetContent, SheetTrigger } from '../ui/Sheet'
+import ThemeToggle from './ThemeToggle'
+import LanguageToggle from './LanguageToggle'
 
 export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const navLinks = [
+    { to: '/destinations', label: t('nav.destinations'), icon: MapPin },
+    { to: '/planner', label: t('nav.planner'), icon: Sparkles },
+    ...(isAuthenticated ? [{ to: '/family', label: t('nav.family'), icon: Users }] : []),
+  ]
 
   const handleLogout = () => {
     logout()
@@ -20,15 +34,15 @@ export default function Navbar() {
   }
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 glass shadow-soft">
+    <header className="fixed top-0 inset-x-0 z-50 glass dark:bg-brand-950/70 dark:border-brand-800/50 shadow-soft">
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-glow group-hover:scale-105 transition-transform">
               <Compass className="w-5 h-5 text-white" />
             </div>
-            <span className="font-display text-xl font-semibold text-brand-900 hidden sm:block">
-              Family Trip Planner
+            <span className="font-display text-xl font-semibold text-brand-900 dark:text-white hidden sm:block">
+              Triparoo
             </span>
           </Link>
 
@@ -40,8 +54,8 @@ export default function Navbar() {
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-brand-500/10 text-brand-700'
-                      : 'text-brand-600 hover:bg-brand-50 hover:text-brand-800'
+                      ? 'bg-brand-500/10 text-brand-700 dark:bg-brand-400/10 dark:text-brand-200'
+                      : 'text-brand-600 hover:bg-brand-50 hover:text-brand-800 dark:text-brand-300 dark:hover:bg-brand-800/60 dark:hover:text-white'
                   }`
                 }
               >
@@ -51,84 +65,97 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
+            <ThemeToggle />
+            <LanguageToggle />
             {isAuthenticated ? (
-              <>
-                <span className="text-sm text-brand-600 flex items-center gap-1.5">
-                  <User className="w-4 h-4" />
-                  {user?.first_name || user?.username}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:text-sunset-600 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign out
-                </button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 rounded-full pl-2 pr-3">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 text-white text-xs font-bold">
+                      {(user?.first_name || user?.username || '?').charAt(0).toUpperCase()}
+                    </span>
+                    <span className="max-w-[8rem] truncate">{user?.first_name || user?.username}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate('/family')}>
+                    <Users className="w-4 h-4" /> {t('nav.family')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-sunset-600 dark:text-sunset-400">
+                    <LogOut className="w-4 h-4" /> {t('nav.signOut')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <>
-                <Link
-                  to="/login"
-                  className="px-4 py-2 text-sm font-medium text-brand-700 hover:text-brand-900 transition-colors"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  to="/register"
-                  className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-brand-500 to-brand-600 rounded-xl hover:from-brand-600 hover:to-brand-700 shadow-soft transition-all hover:shadow-card"
-                >
-                  Get started
-                </Link>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/login">{t('nav.signIn')}</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link to="/register">{t('nav.getStarted')}</Link>
+                </Button>
               </>
             )}
           </div>
 
-          <button
-            className="md:hidden p-2 rounded-lg text-brand-700 hover:bg-brand-50"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="md:hidden flex items-center gap-1">
+            <ThemeToggle />
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Open menu">
+                  <Menu className="w-6 h-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <div className="flex flex-col gap-1 mt-8">
+                  {navLinks.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-brand-700 hover:bg-brand-50 dark:text-brand-100 dark:hover:bg-brand-800"
+                    >
+                      <Icon className="w-5 h-5" />
+                      {label}
+                    </NavLink>
+                  ))}
+                  <div className="px-4 py-3">
+                    <LanguageToggle />
+                  </div>
+                  {isAuthenticated ? (
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-sunset-600 hover:bg-sunset-400/10 text-left"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      {t('nav.signOut')}
+                    </button>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-brand-700 dark:text-brand-100"
+                      >
+                        <User className="w-5 h-5" />
+                        {t('nav.signIn')}
+                      </Link>
+                      <Link
+                        to="/register"
+                        onClick={() => setMobileOpen(false)}
+                        className="block mx-4 py-3 text-center text-white bg-brand-500 rounded-xl font-semibold"
+                      >
+                        {t('nav.getStarted')}
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
-
-        {mobileOpen && (
-          <div className="md:hidden pb-4 space-y-1 border-t border-brand-100 mt-2 pt-3">
-            {navLinks.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-brand-700 hover:bg-brand-50"
-              >
-                <Icon className="w-5 h-5" />
-                {label}
-              </NavLink>
-            ))}
-            {isAuthenticated ? (
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sunset-600 hover:bg-sunset-400/10"
-              >
-                <LogOut className="w-5 h-5" />
-                Sign out
-              </button>
-            ) : (
-              <>
-                <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-brand-700">
-                  Sign in
-                </Link>
-                <Link
-                  to="/register"
-                  onClick={() => setMobileOpen(false)}
-                  className="block mx-4 py-3 text-center text-white bg-brand-500 rounded-xl font-semibold"
-                >
-                  Get started
-                </Link>
-              </>
-            )}
-          </div>
-        )}
       </nav>
     </header>
   )

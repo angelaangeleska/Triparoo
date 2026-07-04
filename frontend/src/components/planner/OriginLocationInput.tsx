@@ -54,28 +54,28 @@ export default function OriginLocationInput({ value, onChange }: Props) {
             onChange(e.target.value)
           }}
           placeholder="City or country — e.g. Skopje, Rome, Italy, France"
-          className="w-full pl-11 pr-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400"
+          className="w-full pl-11 pr-4 py-3 rounded-xl border border-brand-200 dark:border-brand-700 bg-white/80 dark:bg-brand-900/60 dark:text-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-400"
         />
       </div>
 
       {loading && (
-        <p className="text-xs text-brand-500 mt-2 flex items-center gap-1.5">
+        <p className="text-xs text-brand-500 dark:text-brand-400 mt-2 flex items-center gap-1.5">
           <MapPin className="w-3.5 h-3.5 animate-pulse" />
           Looking up flights near {query}...
         </p>
       )}
 
       {!loading && resolved && query.trim().length >= 2 && (
-        <div className="mt-2 px-4 py-3 rounded-xl bg-brand-50 border border-brand-100">
-          <p className="text-sm text-brand-800 font-medium">{resolved.message}</p>
-          <p className="text-xs text-brand-500 mt-1">
+        <div className="mt-2 px-4 py-3 rounded-xl bg-brand-50 dark:bg-brand-800/50 border border-brand-100 dark:border-brand-700">
+          <p className="text-sm text-brand-800 dark:text-brand-100 font-medium">{resolved.message}</p>
+          <p className="text-xs text-brand-500 dark:text-brand-400 mt-1">
             No need to pick an airport — we handle that automatically.
           </p>
         </div>
       )}
 
       {!loading && !resolved && query.trim().length >= 2 && (
-        <p className="text-xs text-brand-500 mt-2">
+        <p className="text-xs text-brand-500 dark:text-brand-400 mt-2">
           Type a city (Skopje, Lyon), city with country (Rome, Italy), or country (France). Airports are chosen automatically.
         </p>
       )}

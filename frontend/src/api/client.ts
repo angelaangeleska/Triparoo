@@ -1,6 +1,7 @@
 import type {
   Accommodation,
   AccommodationSummary,
+  AITripGuide,
   Airport,
   AirportSearchResult,
   Attraction,
@@ -9,6 +10,8 @@ import type {
   ChildActivity,
   Destination,
   DestinationRecommendation,
+  FamilyMember,
+  FamilyMemberInput,
   ItineraryDay,
   ResolvedOrigin,
   TripMember,
@@ -247,6 +250,25 @@ export const api = {
       within_budget: boolean
       alternatives: BudgetAlternative[]
     }>('/trip-planner/budget-optimize', { method: 'POST', body: JSON.stringify(data) }),
+
+  aiGuide: (data: {
+    destination_id: number
+    members: TripMember[]
+    budget: number
+    start_date?: string
+    end_date?: string
+    interests?: string[]
+  }) => request<AITripGuide>('/trip-planner/ai-guide', { method: 'POST', body: JSON.stringify(data) }),
+
+  familyMembers: () => request<FamilyMember[]>('/family-members'),
+
+  createFamilyMember: (data: FamilyMemberInput) =>
+    request<FamilyMember>('/family-members', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateFamilyMember: (id: number, data: FamilyMemberInput) =>
+    request<FamilyMember>(`/family-members/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deleteFamilyMember: (id: number) => request<void>(`/family-members/${id}`, { method: 'DELETE' }),
 }
 
 export { ApiError }

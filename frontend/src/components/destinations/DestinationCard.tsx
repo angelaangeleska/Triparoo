@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Heart, MapPin, Star } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { Destination } from '../../types'
 import CityImage from '../ui/CityImage'
 
@@ -8,10 +9,12 @@ interface Props {
 }
 
 export default function DestinationCard({ destination }: Props) {
+  const { t } = useTranslation()
+
   return (
     <Link
       to={`/destinations/${destination.id}`}
-      className="group block glass rounded-2xl overflow-hidden shadow-soft hover:shadow-card transition-all duration-300 hover:-translate-y-1"
+      className="group block glass dark:bg-brand-900/50 dark:border-brand-800 rounded-2xl overflow-hidden shadow-soft hover:shadow-card transition-all duration-300 hover:-translate-y-1"
     >
       <div className="relative h-52 overflow-hidden">
         <CityImage
@@ -29,16 +32,18 @@ export default function DestinationCard({ destination }: Props) {
         </div>
       </div>
       <div className="p-5">
-        <p className="text-sm text-brand-600 line-clamp-2 leading-relaxed mb-4">
+        <p className="text-sm text-brand-600 dark:text-brand-300 line-clamp-2 leading-relaxed mb-4">
           {destination.description}
         </p>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-sm">
             <Heart className="w-4 h-4 text-sunset-500" />
-            <span className="font-semibold text-brand-800">{destination.family_friendliness_score.toFixed(0)}</span>
-            <span className="text-brand-500">family score</span>
+            <span className="font-semibold text-brand-800 dark:text-brand-100">
+              {destination.family_friendliness_score.toFixed(0)}
+            </span>
+            <span className="text-brand-500 dark:text-brand-400">{t('destinations.familyScore')}</span>
           </div>
-          <div className="flex items-center gap-1 text-sm text-brand-600">
+          <div className="flex items-center gap-1 text-sm text-brand-600 dark:text-brand-300">
             <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             {destination.popularity_score.toFixed(0)}
           </div>

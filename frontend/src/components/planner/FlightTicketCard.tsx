@@ -27,7 +27,7 @@ function formatMoney(amount: number, currency = 'EUR') {
 
 function FlightLeg({ leg, label }: { leg: FlightLegSummary; label: string }) {
   return (
-    <div className="rounded-xl border border-brand-100 bg-white/80 p-4 space-y-3">
+    <div className="rounded-xl border border-brand-100 dark:border-brand-700 bg-white/80 dark:bg-brand-900/60 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-wider text-brand-500">{label}</span>
         <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 font-medium">
@@ -37,14 +37,14 @@ function FlightLeg({ leg, label }: { leg: FlightLegSummary; label: string }) {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-brand-900 text-lg">{leg.airline}</p>
-          <p className="text-sm text-brand-600 mt-0.5">
+          <p className="font-semibold text-brand-900 dark:text-white text-lg">{leg.airline}</p>
+          <p className="text-sm text-brand-600 dark:text-brand-300 mt-0.5">
             {leg.airline_code} · {leg.flight_number} · {leg.cabin_class}
           </p>
         </div>
         <div className="text-right">
-          <p className="font-display text-xl font-bold text-brand-800">{formatMoney(leg.price, leg.currency)}</p>
-          <p className="text-xs text-brand-500">
+          <p className="font-display text-xl font-bold text-brand-800 dark:text-brand-100">{formatMoney(leg.price, leg.currency)}</p>
+          <p className="text-xs text-brand-500 dark:text-brand-400">
             {leg.fare_note || `${formatMoney(leg.price_per_person, leg.currency)} / person`}
           </p>
         </div>
@@ -52,22 +52,22 @@ function FlightLeg({ leg, label }: { leg: FlightLegSummary; label: string }) {
 
       <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
         <div className="min-w-0">
-          <p className="text-2xl font-bold text-brand-900">{leg.origin_iata}</p>
-          <p className="text-sm text-brand-700 truncate">{leg.origin_city}</p>
-          <p className="text-xs text-brand-500 truncate" title={leg.origin_airport}>{leg.origin_airport}</p>
+          <p className="text-2xl font-bold text-brand-900 dark:text-white">{leg.origin_iata}</p>
+          <p className="text-sm text-brand-700 dark:text-brand-200 truncate">{leg.origin_city}</p>
+          <p className="text-xs text-brand-500 dark:text-brand-400 truncate" title={leg.origin_airport}>{leg.origin_airport}</p>
         </div>
         <div className="flex flex-col items-center text-brand-400 px-2 shrink-0">
           <Plane className="w-5 h-5 rotate-90" />
-          <span className="text-xs font-medium text-brand-500 mt-1 whitespace-nowrap">{leg.duration}</span>
+          <span className="text-xs font-medium text-brand-500 dark:text-brand-400 mt-1 whitespace-nowrap">{leg.duration}</span>
         </div>
         <div className="min-w-0 text-right">
-          <p className="text-2xl font-bold text-brand-900">{leg.destination_iata}</p>
-          <p className="text-sm text-brand-700 truncate">{leg.destination_city}</p>
-          <p className="text-xs text-brand-500 truncate" title={leg.destination_airport}>{leg.destination_airport}</p>
+          <p className="text-2xl font-bold text-brand-900 dark:text-white">{leg.destination_iata}</p>
+          <p className="text-sm text-brand-700 dark:text-brand-200 truncate">{leg.destination_city}</p>
+          <p className="text-xs text-brand-500 dark:text-brand-400 truncate" title={leg.destination_airport}>{leg.destination_airport}</p>
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-2 text-sm text-brand-700">
+      <div className="grid sm:grid-cols-2 gap-2 text-sm text-brand-700 dark:text-brand-200">
         <p className="flex items-start gap-2 min-w-0">
           <Calendar className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
           <span className="min-w-0">
@@ -98,22 +98,22 @@ export default function FlightTicketCard({ flight }: Props) {
   const alternatives = flight.alternatives ?? []
 
   return (
-    <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-sand-50 p-4 space-y-4">
+    <div className="rounded-2xl border border-brand-200 dark:border-brand-700 bg-gradient-to-br from-brand-50 via-white to-sand-50 dark:from-brand-900 dark:via-brand-900 dark:to-brand-900 p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-brand-500 uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-xs font-semibold text-brand-500 dark:text-brand-300 uppercase tracking-wider">
           <Plane className="w-4 h-4" />
           Flight details
           {flight.source === 'amadeus' && (
-            <span className="normal-case px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">
+            <span className="normal-case px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
               Live prices
             </span>
           )}
         </div>
         <div className="text-right">
-          <p className="font-display text-2xl font-bold text-brand-900">
+          <p className="font-display text-2xl font-bold text-brand-900 dark:text-white">
             {formatMoney(flight.total_price, flight.currency)}
           </p>
-          <p className="text-xs text-brand-600">
+          <p className="text-xs text-brand-600 dark:text-brand-300">
             {formatMoney(flight.total_price_per_person, flight.currency)} / person · {flight.party_size} travelers ·{' '}
             {flight.trip_type === 'round_trip' ? 'Round trip' : 'One way'}
           </p>

@@ -16,6 +16,7 @@ from app.models.attraction import Attraction
 from app.models.country import Airport, City, Country
 from app.models.destination import Destination
 from app.models.destination_season import DestinationSeason
+from app.models.family_member import FamilyMember
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -270,17 +271,35 @@ async def seed() -> None:
 
 async def _ensure_demo_user(session) -> None:
     result = await session.execute(select(User).where(User.email == DEMO_USER["email"]))
-    if result.scalar_one_or_none():
+    existing_user = result.scalar_one_or_none()
+    if existing_user:
         return
-    session.add(
-        User(
-            email=DEMO_USER["email"],
-            username=DEMO_USER["username"],
-            hashed_password=hash_password(DEMO_USER["password"]),
-            first_name=DEMO_USER["first_name"],
-            last_name=DEMO_USER["last_name"],
-            is_active=True,
-        )
+
+    user = User(
+        email=DEMO_USER["email"],
+        username=DEMO_USER["username"],
+        hashed_password=hash_password(DEMO_USER["password"]),
+        first_name=DEMO_USER["first_name"],
+        last_name=DEMO_USER["last_name"],
+        is_active=True,
+    )
+    session.add(user)
+    await session.flush()
+
+    # A starter family profile so the Trip Planner / Kids Activities demo isn't empty on first login.
+    session.add_all(
+        [
+            FamilyMember(user_id=user.id, name="Alex", age=35, gender="male", interests=[]),
+            FamilyMember(user_id=user.id, name="Sam", age=33, gender="female", interests=[]),
+            FamilyMember(
+                user_id=user.id,
+                name="Mia",
+                age=11,
+                gender="female",
+                relation_type="child",
+                interests=["disney", "science"],
+            ),
+        ]
     )
 
 
