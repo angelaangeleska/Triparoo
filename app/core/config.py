@@ -35,14 +35,14 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     # When true, flight/hotel prices come from DB cache instead of SerpAPI
     USE_DB_PRICES: bool = False
-    # Rule engine weights (sum used for normalization)
-    WEIGHT_CHILD_AGE: float = 0.20
-    WEIGHT_BUDGET: float = 0.20
-    WEIGHT_SEASON: float = 0.15
-    WEIGHT_POPULARITY: float = 0.10
-    WEIGHT_FAMILY_FRIENDLY: float = 0.15
-    WEIGHT_ACTIVITY: float = 0.10
-    WEIGHT_WEATHER: float = 0.10
+    # Rule engine weights (sum used for normalization; budget is filter-only, not ranked)
+    WEIGHT_CHILD_AGE: float = 0.25
+    WEIGHT_BUDGET: float = 0.0
+    WEIGHT_SEASON: float = 0.20
+    WEIGHT_POPULARITY: float = 0.05
+    WEIGHT_FAMILY_FRIENDLY: float = 0.10
+    WEIGHT_ACTIVITY: float = 0.25
+    WEIGHT_WEATHER: float = 0.15
 
     HYBRID_RULE_WEIGHT: float = 0.7
     HYBRID_LLM_WEIGHT: float = 0.3

@@ -1,6 +1,6 @@
-from app.core.config import settings
 from app.recommendation.base import RecommendationContext, ScoredDestination
 from app.recommendation.rule_engine import RuleBasedScorer
+from app.services.groq_service import score_destinations_with_ai
 
 
 class HybridRecommendationService:
@@ -9,12 +9,6 @@ class HybridRecommendationService:
         rule_scorer: RuleBasedScorer | None = None,
     ):
         self.rule_scorer = rule_scorer or RuleBasedScorer()
-
-    def _origin_flight_boost(self, context: RecommendationContext, flight_cost: float) -> float:
-        if not context.origin_airport_id or flight_cost <= 0:
-            return 0.0
-        ratio = flight_cost / max(context.budget, 1.0)
-        return max(0.0, min(12.0, 12.0 - ratio * 15.0))
 
     async def rank(
         self,
@@ -33,10 +27,7 @@ class HybridRecommendationService:
             result = self.rule_scorer.score_destination(
                 dest, context, cost["total"], dest.attractions or []
             )
-            rule_score = min(
-                100.0,
-                result.total + self._origin_flight_boost(context, cost.get("flight", 0.0)),
-            )
+            rule_score = min(100.0, result.total)
             scored.append(
                 ScoredDestination(
                     destination_id=dest.id,
@@ -54,19 +45,55 @@ class HybridRecommendationService:
                 )
             )
 
-        scored.sort(key=lambda s: (s.rule_score, -s.estimated_total_cost), reverse=True)
+        scored.sort(key=lambda s: s.rule_score, reverse=True)
         top = scored[:10]
+
+        members_payload = [
+            {
+                "age": m.age,
+                "gender": m.gender,
+                "interests": m.interests or [],
+            }
+            for m in context.members
+        ]
+        dest_payload = [
+            {
+                "city": s.city,
+                "country": s.country,
+                "estimated_total_cost": s.estimated_total_cost,
+            }
+            for s in top
+        ]
+        ai_scores = await score_destinations_with_ai(
+            members=members_payload,
+            budget=context.budget,
+            travel_month=context.preferred_month,
+            start_date=context.start_date,
+            end_date=context.end_date,
+            destinations=dest_payload,
+        )
+        ai_by_city = {item["city"].lower(): item for item in ai_scores}
 
         results = []
         for s in top:
+            ai = ai_by_city.get(s.city.lower())
+            if ai:
+                llm_score = ai["llm_score"]
+                explanation = ai.get("reason", "")
+                final_score = round(0.7 * s.rule_score + 0.3 * llm_score, 2)
+            else:
+                llm_score = s.rule_score
+                explanation = ""
+                final_score = round(s.rule_score, 2)
+
             results.append(
                 {
                     "destination_id": s.destination_id,
                     "city": s.city,
                     "country": s.country,
                     "rule_score": s.rule_score,
-                    "llm_score": s.rule_score,
-                    "final_score": round(s.rule_score, 2),
+                    "llm_score": llm_score,
+                    "final_score": final_score,
                     "estimated_total_cost": s.estimated_total_cost,
                     "flight_cost": s.flight_cost,
                     "accommodation_cost": s.accommodation_cost,
@@ -74,7 +101,7 @@ class HybridRecommendationService:
                     "flight_offer": s.flight_offer,
                     "accommodation_offer": s.accommodation_offer,
                     "score_breakdown": s.score_breakdown,
-                    "explanation": "",
+                    "explanation": explanation,
                     "suggested_attraction_ids": s.suggested_attraction_ids,
                 }
             )

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 
 from app.core.config import settings
 from app.models.attraction import Attraction
@@ -26,7 +27,6 @@ class RuleBasedScorer:
         party_size = len(context.members)
 
         child_age_score = self._score_child_age(children, attractions)
-        budget_score = self._score_budget(context.budget, estimated_cost)
         season_score, weather_score = self._score_season(destination, context)
         popularity_score = min(destination.popularity_score, 100.0)
         family_score = min(destination.family_friendliness_score, 100.0)
@@ -43,7 +43,7 @@ class RuleBasedScorer:
         }
         breakdown = {
             "child_age": child_age_score,
-            "budget": budget_score,
+            "budget": 100.0 if estimated_cost <= context.budget else 0.0,
             "season": season_score,
             "popularity": popularity_score,
             "family_friendly": family_score,
@@ -71,52 +71,88 @@ class RuleBasedScorer:
         max_possible = len(children) * max(len(attractions), 1)
         return min(100.0, (matches / max_possible) * 100 + 20)
 
-    def _score_budget(self, budget: float, estimated_cost: float) -> float:
-        if estimated_cost <= 0:
-            return 50.0
-        ratio = budget / estimated_cost
-        if ratio >= 1.2:
-            return 100.0
-        if ratio >= 1.0:
-            return 90.0
-        if ratio >= 0.85:
-            return 70.0
-        if ratio >= 0.7:
-            return 45.0
-        return 20.0
+    def _trip_months(self, context: RecommendationContext) -> list[int]:
+        if context.start_date and context.end_date:
+            months: set[int] = set()
+            current = context.start_date
+            while current <= context.end_date:
+                months.add(current.month)
+                current += timedelta(days=1)
+            return sorted(months)
+        if context.preferred_month:
+            return [context.preferred_month]
+        if context.start_date:
+            return [context.start_date.month]
+        return []
+
+    def _season_for_month(self, destination: Destination, month: int) -> tuple[float, float]:
+        for season in destination.seasons or []:
+            if season.month_start <= month <= season.month_end:
+                weather = min(season.weather_score * 100, 100.0)
+                return weather, weather
+        return 50.0, 50.0
 
     def _score_season(self, destination: Destination, context: RecommendationContext) -> tuple[float, float]:
-        month = context.preferred_month
-        if not month and context.start_date:
-            month = context.start_date.month
-        if not month:
+        months = self._trip_months(context)
+        if not months:
             return 60.0, 60.0
 
-        for season in destination.seasons:
-            if season.month_start <= month <= season.month_end:
-                season_score = season.weather_score * (2.0 - min(season.price_multiplier, 2.0)) * 50
-                return min(season_score, 100.0), min(season.weather_score * 100, 100.0)
-        return 50.0, 50.0
+        season_scores: list[float] = []
+        weather_scores: list[float] = []
+        for month in months:
+            season_score, weather_score = self._season_for_month(destination, month)
+            season_scores.append(season_score)
+            weather_scores.append(weather_score)
+        return (
+            sum(season_scores) / len(season_scores),
+            sum(weather_scores) / len(weather_scores),
+        )
+
+    def _attraction_interest_score(self, child: MemberContext, attraction: Attraction) -> float:
+        if not (attraction.min_age <= child.age <= attraction.max_age):
+            return 0.0
+        interests = [i.lower().strip() for i in (child.interests or []) if i.strip()]
+        if not interests:
+            return 1.0 if attraction.family_friendly else 0.5
+
+        haystack = " ".join(
+            [
+                attraction.name.lower(),
+                attraction.category.lower(),
+                " ".join((attraction.tags or [])).lower(),
+            ]
+        )
+        tags = {t.lower() for t in (attraction.tags or [])}
+        score = 0.0
+        for interest in interests:
+            if interest in haystack or interest in tags:
+                score += 3.0
+            elif any(interest in tag or tag in interest for tag in tags):
+                score += 2.0
+            elif any(word in haystack for word in interest.split()):
+                score += 1.0
+        return score
 
     def _score_activities(self, children: list[MemberContext], attractions: list[Attraction]) -> float:
         if not attractions:
             return 30.0
-        child_friendly = [a for a in attractions if a.family_friendly]
-        base = len(child_friendly) / len(attractions) * 80
-        if children:
-            interest_tags = {i.lower() for c in children for i in c.interests}
-            tag_matches = sum(
-                1 for a in child_friendly if any(t in interest_tags for t in (a.tags or []))
-            )
-            base += min(tag_matches * 10, 20)
-        return min(base, 100.0)
+        if not children:
+            child_friendly = [a for a in attractions if a.family_friendly]
+            return min(len(child_friendly) / len(attractions) * 80, 100.0)
+
+        total = 0.0
+        max_possible = len(children) * len(attractions) * 3.0
+        for child in children:
+            for att in attractions:
+                total += self._attraction_interest_score(child, att)
+        return min(100.0, (total / max(max_possible, 1)) * 100 + 20)
 
     def _pick_attractions(self, children: list[MemberContext], attractions: list[Attraction]) -> list[Attraction]:
         if not children:
-            return sorted(attractions, key=lambda a: a.price)[:5]
+            return attractions[:5]
         scored = []
         for att in attractions:
-            fit = sum(1 for c in children if att.min_age <= c.age <= att.max_age)
+            fit = sum(self._attraction_interest_score(c, att) for c in children)
             scored.append((fit, att))
-        scored.sort(key=lambda x: (-x[0], x[1].price))
+        scored.sort(key=lambda x: -x[0])
         return [a for _, a in scored[:5]]
