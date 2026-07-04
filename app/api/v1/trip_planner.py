@@ -13,7 +13,6 @@ from app.models.user import User
 from app.schemas.ai_guide import AITripGuideRequest, AITripGuideResponse
 from app.schemas.trip_planner import (
     AccommodationSummary,
-    BookingSourceSummary,
     BudgetOptimizeRequest,
     BudgetOptimizeResponse,
     CheapestDatesRequest,
@@ -36,28 +35,6 @@ from app.services.trip_planner_service import TripPlannerService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trip-planner", tags=["Trip Planner"])
-
-
-def _to_accommodation_summary(data: dict) -> AccommodationSummary:
-    sources = [BookingSourceSummary(**s) for s in (data.get("booking_sources") or [])]
-    return AccommodationSummary(
-        name=data.get("name", ""),
-        type=data.get("type", ""),
-        hotel_class=data.get("hotel_class", ""),
-        rating=data.get("rating"),
-        reviews_count=data.get("reviews_count"),
-        price_per_night=data.get("price_per_night", 0.0),
-        total_price=data.get("total_price", 0.0),
-        currency=data.get("currency", "EUR"),
-        family_friendly=data.get("family_friendly", False),
-        image_url=data.get("image_url", ""),
-        google_url=data.get("google_url", ""),
-        booking_sources=sources,
-        amenities=data.get("amenities") or [],
-        check_in_time=data.get("check_in_time", ""),
-        check_out_time=data.get("check_out_time", ""),
-        source=data.get("source", "amadeus"),
-    )
 
 
 @router.get("/hotels", response_model=list[AccommodationSummary])
@@ -87,7 +64,8 @@ async def search_hotels(
                 country=country,
             )
         )
-        return [_to_accommodation_summary(accommodation_to_dict(o)) for o in offers]
+        summaries = [AccommodationSummary.from_dict(accommodation_to_dict(o)) for o in offers]
+        return [s for s in summaries if s]
     except Exception as exc:
         logger.exception("Hotel search failed")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -116,11 +94,11 @@ async def resolve_origin(
 async def recommend(
     payload: RecommendRequest,
     session=Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     try:
         service = TripPlannerService(session)
-        return await service.recommend(payload)
+        return await service.recommend(payload, user.id)
     except AppException as exc:
         raise handle_app_exception(exc)
 

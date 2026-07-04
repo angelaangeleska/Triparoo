@@ -1,7 +1,5 @@
 from datetime import date
 
-import pytest
-
 from app.integrations.flights.amadeus_flight import AmadeusFlightProvider
 from app.integrations.flights.base import FlightSearchCriteria
 

@@ -1,8 +1,7 @@
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.country import Airport, City, Country
+from app.models.country import Airport, City
 from app.models.destination import Destination
 from app.models.user import User
 from app.repositories.base import GenericRepository

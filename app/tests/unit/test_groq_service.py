@@ -1,6 +1,5 @@
-from app.recommendation.base import RecommendationContext
-from app.services.groq_service import GroqRecommendationProvider, _parse_narratives, _strip_code_fence
 from app.recommendation.base import ScoredDestination
+from app.services.groq_service import GroqRecommendationProvider, _parse_narratives, _strip_code_fence
 
 
 def _candidate(dest_id: int, rule_score: float = 70.0) -> ScoredDestination:

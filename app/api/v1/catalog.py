@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 
@@ -9,7 +7,6 @@ from app.integrations.places.factory import get_places_provider
 from app.models.accommodation import Accommodation
 from app.models.activity import Activity
 from app.models.attraction import Attraction
-from app.models.country import Airport
 from app.models.flight import Flight
 from app.repositories.catalog import AirportRepository, DestinationRepository
 from app.schemas.catalog import (

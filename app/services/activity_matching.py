@@ -17,7 +17,7 @@ _CATEGORY_INTERESTS: dict[str, set[str]] = {
     "museum": {"museum", "science", "art"},
     "theme_park": {"theme_park", "disney"},
     "park": {"outdoor", "animals"},
-    "landmark": {"history", "outdoor"},
+    "landmark": {"history"},
 }
 
 

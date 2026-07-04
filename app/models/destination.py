@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from app.models.accommodation import Accommodation
     from app.models.activity import Activity
     from app.models.attraction import Attraction
-    from app.models.city import City
+    from app.models.country import City
     from app.models.destination_season import DestinationSeason
 
 

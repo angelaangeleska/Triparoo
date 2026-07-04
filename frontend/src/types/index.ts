@@ -259,6 +259,41 @@ export interface AITripGuide {
   transportation_tips: AIGuideItem[]
 }
 
+export interface TripHistoryMember {
+  id: number
+  age: number
+  gender?: string
+  interests: string[]
+}
+
+export interface TripHistoryRecommendation {
+  id: number
+  entity_id?: number
+  rule_score: number
+  llm_score: number
+  final_score: number
+  explanation: {
+    city: string
+    country: string
+    text: string
+    highlights: string[]
+    estimated_total_cost: number
+  }
+  created_at: string
+}
+
+export interface TripHistory {
+  id: number
+  origin_airport_id?: number
+  start_date?: string
+  end_date?: string
+  budget?: number
+  status: string
+  created_at: string
+  members: TripHistoryMember[]
+  recommendations: TripHistoryRecommendation[]
+}
+
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',

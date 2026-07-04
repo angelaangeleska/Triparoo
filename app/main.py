@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         description=(
-            "Family Trip Planner — intelligent travel planning platform for families. "
+            "Triparoo — intelligent travel planning platform for families. "
             "Provides destination recommendations, budget optimization, itinerary generation, "
             "and child-friendly activity suggestions using a hybrid rule-based + LLM engine."
         ),

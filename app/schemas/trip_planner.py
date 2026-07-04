@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.schemas.family import TripMemberInput
 
@@ -111,6 +111,30 @@ class AccommodationSummary(BaseModel):
     check_in_time: str = ""
     check_out_time: str = ""
     source: str = "amadeus"
+
+    @classmethod
+    def from_dict(cls, data: Optional[dict]) -> Optional["AccommodationSummary"]:
+        if not data:
+            return None
+        sources = [BookingSourceSummary(**s) for s in (data.get("booking_sources") or [])]
+        return cls(
+            name=data.get("name", ""),
+            type=data.get("type", ""),
+            hotel_class=data.get("hotel_class", ""),
+            rating=data.get("rating"),
+            reviews_count=data.get("reviews_count"),
+            price_per_night=data.get("price_per_night", 0.0),
+            total_price=data.get("total_price", 0.0),
+            currency=data.get("currency", "EUR"),
+            family_friendly=data.get("family_friendly", False),
+            image_url=data.get("image_url", ""),
+            google_url=data.get("google_url", ""),
+            booking_sources=sources,
+            amenities=data.get("amenities") or [],
+            check_in_time=data.get("check_in_time", ""),
+            check_out_time=data.get("check_out_time", ""),
+            source=data.get("source", "amadeus"),
+        )
 
 
 class DestinationRecommendation(BaseModel):

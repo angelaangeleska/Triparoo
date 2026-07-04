@@ -14,6 +14,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const PlannerPage = lazy(() => import('./pages/PlannerPage'))
 const FamilyPage = lazy(() => import('./pages/FamilyPage'))
+const MyTripsPage = lazy(() => import('./pages/MyTripsPage'))
 const DestinationsPage = lazy(() => import('./pages/DestinationsPage'))
 const DestinationDetailPage = lazy(() => import('./pages/DestinationDetailPage'))
 
@@ -45,6 +46,7 @@ export default function App() {
                     <Route element={<ProtectedRoute />}>
                       <Route path="/planner" element={<PlannerPage />} />
                       <Route path="/family" element={<FamilyPage />} />
+                      <Route path="/trips" element={<MyTripsPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>

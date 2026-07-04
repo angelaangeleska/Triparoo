@@ -2,7 +2,8 @@
 
 ## Overview
 
-Family Trip Planner follows **clean architecture** principles with strict dependency direction: outer layers depend on inner layers, never the reverse.
+Triparoo follows **clean architecture** principles with strict dependency direction: outer layers depend on inner
+layers, never the reverse.
 
 ```mermaid
 flowchart TB
@@ -43,11 +44,13 @@ flowchart TB
 ### Service Layer (`app/services/`)
 
 - Orchestrates business workflows
-- `TripPlannerService` — destination recommendations, cheapest search
-- `ItineraryService` — day-by-day plan generation
+- `TripPlannerService` — destination recommendations, cheapest search, records trip history
+- `TripHistoryService` — persists and retrieves past trip searches
+- `FamilyMemberService` — CRUD for the saved family profile
+- `ItineraryService` / `ChildActivityService` — day-by-day plans and age-matched attraction filtering
+- `AITripGuideService` — Groq-generated restaurants/hidden gems/local tips, grounded with Google Places data
 - `BudgetOptimizationService` — cost comparison and alternatives
-- `ChildActivityService` — age-matched attraction filtering
-- `CostEstimatorService` — trip cost calculation
+- `CostEstimatorService` — trip cost calculation (flights + hotels + activities)
 - `AuthService` — registration, authentication, token management
 
 ### Repository Layer (`app/repositories/`)
@@ -68,21 +71,29 @@ Hybrid two-part system:
    - Activity availability and interest matching
 
 2. **RecommendationProvider** (Protocol) — LLM reasoning abstraction
-   - `MockLLMProvider` — deterministic template-based explanations
-   - Future: OpenAI, Gemini, Claude implementations
+   - `GroqRecommendationProvider` — real AI call (`llama-3.3-70b-versatile` by default): natural-language
+     explanation, highlight phrases, and an independent 0–100 match score per candidate
+   - `NullRecommendationProvider` — deterministic fallback used when `GROQ_API_KEY` is unset (never breaks the
+     endpoint)
+   - Swapping to OpenAI/Gemini/Claude means implementing the same Protocol and updating
+     `app/recommendation/factory.py` — no service-layer changes
 
-3. **HybridRecommendationService** — combines rule score (70%) + LLM score (30%)
+3. **HybridRecommendationService** — combines rule score and LLM score via `HYBRID_RULE_WEIGHT` /
+   `HYBRID_LLM_WEIGHT` (0.7 / 0.3 by default)
 
 ### Integration Layer (`app/integrations/`)
 
-Provider pattern for external services:
+Provider pattern for external services — each is a `Protocol` + a factory that swaps implementations based on
+`Settings`, with no service-layer changes required:
 
-| Protocol | Mock Implementation | Future Integrations |
-|----------|--------------------|--------------------|
-| `FlightProvider` | `MockFlightProvider` | Amadeus, Kiwi, Skyscanner |
-| `AccommodationProvider` | `MockAccommodationProvider` | Booking.com, Airbnb, Expedia |
+| Protocol | Implementation | Notes |
+|----------|-----------------|-------|
+| `FlightProvider` | `AmadeusFlightProvider` | Sole flight provider |
+| `AccommodationProvider` | `AmadeusAccommodationProvider` | Sole hotel provider (city-code resolution → hotel list → priced offers) |
+| `PlacesProvider` | `GooglePlacesProvider` / `NullPlacesProvider` | Self-serve substitute for the TripAdvisor Content API (partner-only, no public signup). Photo URLs are resolved server-side with `skipHttpRedirect=true` so the API key never reaches the browser |
 
-Providers are injected via FastAPI dependencies based on `Settings`.
+Both Amadeus providers share a single cached OAuth2 token (`app/integrations/amadeus_auth.py`) instead of
+re-authenticating on every request.
 
 ## Entity Relationship Diagram
 
@@ -116,13 +127,14 @@ erDiagram
 | Entity | Purpose |
 |--------|---------|
 | **User** | Authentication identity with optional Google OAuth |
-| **FamilyMember** | Saved family profile (age, interests) |
-| **TripRequest** | A planning session with dates, budget, members |
-| **Destination** | City-level travel target with scores |
+| **FamilyMember** | Saved family profile (age, gender, interests) — reused by the Trip Planner and Kids Activities so nothing is entered twice |
+| **TripRequest** | A recorded search (dates, budget, members, origin) — powers the "My Trips" history page |
+| **TripMember** | Snapshot of the family composition at search time, linked to a `TripRequest` |
+| **Recommendation** | One row per ranked destination for a `TripRequest`, storing rule/LLM/final scores and the AI explanation |
+| **Destination** | City-level travel target with family-friendliness/popularity scores |
 | **DestinationSeason** | Seasonal weather and pricing data |
 | **Attraction** | Child-friendly points of interest with age ranges |
-| **Recommendation** | Stored recommendation with rule/LLM scores |
-| **ItineraryDay** | Generated day-by-day plan items |
+| **ItineraryDay**, **BudgetProfile**, **SavedTrip**, **TravelPreference** | Modeled and migrated, not yet written to by any service — available for a future "save this itinerary" / "budget preferences" feature |
 
 ## Authentication Flow
 
@@ -147,22 +159,25 @@ sequenceDiagram
     Client->>API: POST /trip-planner/recommend (Bearer token)
     API->>API: Validate JWT
     API->>Services: recommend()
+    Services->>DB: Record TripRequest + TripMember + Recommendation
     API-->>Client: RecommendResponse
 ```
 
 - **Access tokens**: JWT, short-lived (30 min default)
 - **Refresh tokens**: Stored hashed in DB, rotated on refresh
 - **Google OAuth**: Authorization code flow via Authlib
+- The Trip Planner requires login, since family data and trip history are persisted per account
 
 ## Recommendation Pipeline
 
 ```mermaid
 flowchart LR
-    Input[Family Profile + Budget + Dates]
+    Input[Saved Family Profile + Budget + Dates]
     RuleEngine[RuleBasedScorer]
-    CostEst[CostEstimator]
-    LLM[MockLLMProvider]
+    CostEst[CostEstimator via Amadeus]
+    LLM[GroqRecommendationProvider]
     Hybrid[HybridRecommendationService]
+    History[(TripRequest + Recommendation)]
     Output[Ranked Destinations]
 
     Input --> CostEst
@@ -171,36 +186,38 @@ flowchart LR
     RuleEngine --> Hybrid
     Hybrid --> LLM
     LLM --> Output
+    Output --> History
 ```
 
 ## Swapping Providers
 
-To replace mock providers with real APIs:
+To replace a provider implementation:
 
-1. Implement the Protocol interface (e.g., `FlightProvider`)
-2. Register in `app/api/deps.py` based on settings
-3. No changes needed in service layer
+1. Implement the Protocol interface (e.g., `RecommendationProvider`)
+2. Update the corresponding factory (e.g., `app/recommendation/factory.py`)
+3. No changes needed in the service layer
 
-Example for OpenAI recommendation provider:
+Example for an OpenAI recommendation provider, mirroring `GroqRecommendationProvider`:
 
 ```python
 class OpenAIRecommendationProvider:
     async def explain_recommendations(self, context, candidates):
-        # Call OpenAI API with structured prompt
+        # Call the OpenAI API with the same structured JSON-output prompt
         ...
 ```
-
-Set `RECOMMENDATION_PROVIDER=openai` in environment.
 
 ## Database
 
 - **PostgreSQL 16** with async SQLAlchemy 2.0
 - **Alembic** for migrations
-- JSON columns for flexible data (interests, tags, itinerary items)
-- Seed script populates 7 European destinations with attractions, accommodations, and flights
+- JSON columns for flexible data (interests, tags, itinerary items, AI explanations)
+- Seed script populates 7 European destinations with attractions, accommodations, and seasons, plus a demo user
+  with a starter family (2 adults, 1 child) so the app isn't empty on first login
 
 ## Testing Strategy
 
-- **Unit tests**: Rule engine scoring, mock LLM provider
-- **Integration tests**: Auth flow, API endpoints with in-memory SQLite
-- **Fixtures**: Async test client with dependency overrides
+- **Backend**: pytest — unit tests for rule engine scoring, Amadeus/Groq/Google Places parsing, activity matching,
+  origin resolution; integration tests for auth, family CRUD, and trip history against an in-memory SQLite DB with
+  dependency-overridden fixtures
+- **Frontend**: Vitest + React Testing Library — `AuthContext` session handling, `ProtectedRoute` redirects, the
+  Planner's family-sync logic, and a regression test for the Kids tab auto-fill behavior

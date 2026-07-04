@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { Compass, LogOut, MapPin, Menu, Sparkles, User, Users } from 'lucide-react'
+import { Compass, History, LogOut, MapPin, Menu, Sparkles, User, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../context/AuthContext'
@@ -24,7 +24,12 @@ export default function Navbar() {
   const navLinks = [
     { to: '/destinations', label: t('nav.destinations'), icon: MapPin },
     { to: '/planner', label: t('nav.planner'), icon: Sparkles },
-    ...(isAuthenticated ? [{ to: '/family', label: t('nav.family'), icon: Users }] : []),
+    ...(isAuthenticated
+      ? [
+          { to: '/family', label: t('nav.family'), icon: Users },
+          { to: '/trips', label: t('nav.trips'), icon: History },
+        ]
+      : []),
   ]
 
   const handleLogout = () => {

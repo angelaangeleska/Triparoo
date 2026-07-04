@@ -90,8 +90,13 @@ def _matches_country(airport: "CatalogAirport", country_query: str) -> bool:
     country_lower = airport.country.lower()
     if country_lower == cq or country_lower.startswith(cq):
         return True
-    # e.g. "united states" → "United States of America", "usa" → US code handled above
-    return cq in country_lower
+    # Substring containment (e.g. "united states" → "United States of America") is only safe
+    # for longer queries — short 2-3 letter codes like "us" are already handled by the exact
+    # country_code check above, and matching them as substrings produces false positives
+    # (e.g. "us" incorrectly matching "Australia" or "Mauritius").
+    if len(cq) >= 4:
+        return cq in country_lower
+    return False
 
 
 def ensure_catalog_file() -> None:

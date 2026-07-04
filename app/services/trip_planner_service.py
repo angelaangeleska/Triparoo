@@ -6,11 +6,9 @@ from app.core.exceptions import NotFoundError
 from app.recommendation.base import MemberContext, RecommendationContext
 from app.recommendation.hybrid import HybridRecommendationService
 from app.repositories.catalog import DestinationRepository
-from app.schemas.family import TripMemberInput
 from app.schemas.trip_planner import (
     AccommodationSummary,
     AttractionSummary,
-    BookingSourceSummary,
     CheapestDatesRequest,
     CheapestDatesResponse,
     CheapestDestinationResult,
@@ -25,6 +23,7 @@ from app.schemas.trip_planner import (
 )
 from app.services.cost_estimator import CostEstimatorService
 from app.services.origin_resolver import OriginResolverService
+from app.services.trip_history_service import TripHistoryService
 
 
 class TripPlannerService:
@@ -34,6 +33,7 @@ class TripPlannerService:
         self.cost_estimator = CostEstimatorService(session)
         self.origin_resolver = OriginResolverService(session)
         self.recommendation_service = HybridRecommendationService()
+        self.trip_history_service = TripHistoryService(session)
 
     async def _resolve_origin(self, request: RecommendRequest):
         resolved = None
@@ -75,31 +75,7 @@ class TripPlannerService:
             return None
         return FlightSummary(**offer)
 
-    @staticmethod
-    def _accommodation_summary(data: dict | None) -> AccommodationSummary | None:
-        if not data:
-            return None
-        sources = [BookingSourceSummary(**s) for s in (data.get("booking_sources") or [])]
-        return AccommodationSummary(
-            name=data.get("name", ""),
-            type=data.get("type", ""),
-            hotel_class=data.get("hotel_class", ""),
-            rating=data.get("rating"),
-            reviews_count=data.get("reviews_count"),
-            price_per_night=data.get("price_per_night", 0.0),
-            total_price=data.get("total_price", 0.0),
-            currency=data.get("currency", "EUR"),
-            family_friendly=data.get("family_friendly", False),
-            image_url=data.get("image_url", ""),
-            google_url=data.get("google_url", ""),
-            booking_sources=sources,
-            amenities=data.get("amenities") or [],
-            check_in_time=data.get("check_in_time", ""),
-            check_out_time=data.get("check_out_time", ""),
-            source=data.get("source", "amadeus"),
-        )
-
-    async def recommend(self, request: RecommendRequest) -> RecommendResponse:
+    async def recommend(self, request: RecommendRequest, user_id: int) -> RecommendResponse:
         destinations = await self.dest_repo.list_with_relations()
         resolved, origin_iatas, origin_airport_ids, origin_airport_id, origin_message, origin_label = (
             await self._resolve_origin(request)
@@ -154,13 +130,23 @@ class TripPlannerService:
                     accommodation_cost=r.get("accommodation_cost", 0.0),
                     activity_cost=r.get("activity_cost", 0.0),
                     flight=self._flight_summary(r.get("flight_offer")),
-                    accommodation=self._accommodation_summary(r.get("accommodation_offer")),
+                    accommodation=AccommodationSummary.from_dict(r.get("accommodation_offer")),
                     score_breakdown=ScoreBreakdown(**r["score_breakdown"]),
                     explanation=r["explanation"],
                     highlights=r.get("highlights", []),
                     suggested_attractions=attractions,
                 )
             )
+
+        await self.trip_history_service.record_search(
+            user_id=user_id,
+            members=request.members,
+            budget=request.budget,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            origin_airport_id=origin_airport_id,
+            recommendations=ranked,
+        )
         return RecommendResponse(recommendations=recommendations, origin_message=origin_message)
 
     async def cheapest_destinations(self, request: CheapestDestinationsRequest) -> CheapestDestinationsResponse:

@@ -3,6 +3,7 @@
     "destinations": "Destinations",
     "planner": "Plan Trip",
     "family": "My Family",
+    "trips": "My Trips",
     "signIn": "Sign in",
     "signOut": "Sign out",
     "getStarted": "Get started"
@@ -198,6 +199,18 @@
     "confirmDelete": "Remove this family member?",
     "savedCount": "{{count}} saved",
     "member": "Family member"
+  },
+  "trips": {
+    "title": "My Trips",
+    "subtitle": "Every search you've run is saved here automatically, so you can pick up where you left off.",
+    "empty": "You haven't searched for a trip yet.",
+    "emptyCta": "Head to the planner to get your first recommendations.",
+    "goToPlanner": "Plan a trip",
+    "searchedOn": "Searched on {{date}}",
+    "travelers": "{{count}} travelers",
+    "topPick": "Top pick",
+    "otherOptions_one": "+{{count}} more destination considered",
+    "otherOptions_other": "+{{count}} more destinations considered"
   },
   "interests": {
     "disney": "Disney",

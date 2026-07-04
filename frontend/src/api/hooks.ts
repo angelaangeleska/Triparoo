@@ -6,6 +6,10 @@ export function useDestinations() {
   return useQuery({ queryKey: ['destinations'], queryFn: api.destinations })
 }
 
+export function useTripHistory() {
+  return useQuery({ queryKey: ['trip-history'], queryFn: api.tripHistory })
+}
+
 export function useDestination(id: number) {
   return useQuery({
     queryKey: ['destination', id],

@@ -22,7 +22,6 @@ class RuleBasedScorer:
         attractions: list[Attraction],
     ) -> RuleScoreResult:
         children = [m for m in context.members if m.age < 18]
-        adults = [m for m in context.members if m.age >= 18]
         party_size = len(context.members)
 
         child_age_score = self._score_child_age(children, attractions)

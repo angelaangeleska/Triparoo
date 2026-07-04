@@ -14,6 +14,7 @@ import type {
   FamilyMemberInput,
   ItineraryDay,
   ResolvedOrigin,
+  TripHistory,
   TripMember,
   User,
 } from '../types'
@@ -269,6 +270,10 @@ export const api = {
     request<FamilyMember>(`/family-members/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   deleteFamilyMember: (id: number) => request<void>(`/family-members/${id}`, { method: 'DELETE' }),
+
+  tripHistory: () => request<TripHistory[]>('/trip-history'),
+
+  tripHistoryDetail: (id: number) => request<TripHistory>(`/trip-history/${id}`),
 }
 
 export { ApiError }
