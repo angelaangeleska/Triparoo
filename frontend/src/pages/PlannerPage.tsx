@@ -20,6 +20,7 @@ import RecommendationCard from '../components/planner/RecommendationCard'
 import OriginLocationInput from '../components/planner/OriginLocationInput'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
+import NumericInput from '../components/ui/NumericInput'
 
 const defaultMembers: TripMember[] = [
   { age: 35, interests: [] },
@@ -130,10 +131,10 @@ export default function PlannerPage() {
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
-                        <input
-                          type="number"
+                        <NumericInput
+                          integer
                           value={member.age}
-                          onChange={(e) => updateMember(i, 'age', parseInt(e.target.value) || 0)}
+                          onChange={(age) => updateMember(i, 'age', age)}
                           className="w-16 text-center py-1.5 rounded-lg border border-brand-200 bg-white font-semibold"
                           min={0}
                           max={120}
@@ -202,10 +203,9 @@ export default function PlannerPage() {
                 <Euro className="w-4 h-4" />
                 Budget (EUR)
               </label>
-              <input
-                type="number"
+              <NumericInput
                 value={budget}
-                onChange={(e) => setBudget(parseFloat(e.target.value) || 0)}
+                onChange={setBudget}
                 min={100}
                 className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-400 font-semibold text-lg"
               />

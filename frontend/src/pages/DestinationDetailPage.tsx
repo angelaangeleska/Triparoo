@@ -33,6 +33,7 @@ import { INTEREST_OPTIONS, MONTHS } from '../types'
 import CityImage from '../components/ui/CityImage'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
+import NumericInput from '../components/ui/NumericInput'
 
 type Tab = 'overview' | 'itinerary' | 'activities' | 'dates' | 'budget'
 
@@ -365,12 +366,12 @@ export default function DestinationDetailPage() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="text-sm text-brand-600 mb-1 block">Duration (days)</label>
-                  <input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 1)} min={1} max={30}
+                  <NumericInput integer value={duration} onChange={setDuration} min={1} max={30}
                     className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white" />
                 </div>
                 <div>
                   <label className="text-sm text-brand-600 mb-1 block">Budget (EUR)</label>
-                  <input type="number" value={itineraryBudget} onChange={(e) => setItineraryBudget(parseFloat(e.target.value) || 0)} min={100}
+                  <NumericInput value={itineraryBudget} onChange={setItineraryBudget} min={100}
                     className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white" />
                 </div>
               </div>
@@ -429,7 +430,7 @@ export default function DestinationDetailPage() {
               </h2>
               <div className="mb-4">
                 <label className="text-sm text-brand-600 mb-1 block">Child's age</label>
-                <input type="number" value={childAge} onChange={(e) => setChildAge(parseInt(e.target.value) || 0)} min={0} max={17}
+                <NumericInput integer value={childAge} onChange={setChildAge} min={0} max={17}
                   className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white" />
               </div>
               <div className="mb-4">
@@ -503,10 +504,10 @@ export default function DestinationDetailPage() {
               </div>
               <div>
                 <label className="text-sm text-brand-600 mb-1 block">Travelers</label>
-                <input
-                  type="number"
+                <NumericInput
+                  integer
                   value={datesPartySize}
-                  onChange={(e) => setDatesPartySize(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={setDatesPartySize}
                   min={1}
                   max={9}
                   className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white"
