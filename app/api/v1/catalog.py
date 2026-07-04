@@ -1,9 +1,11 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 
 from app.api.deps import get_db
+from app.integrations.places.base import PlaceSearchCriteria
+from app.integrations.places.factory import get_places_provider
 from app.models.accommodation import Accommodation
 from app.models.activity import Activity
 from app.models.attraction import Attraction
@@ -18,6 +20,7 @@ from app.schemas.catalog import (
     AttractionRead,
     DestinationRead,
     FlightRead,
+    PlaceSummary,
 )
 from app.services.airport_search import AirportSearchService
 
@@ -98,8 +101,6 @@ async def get_destination(destination_id: int, session=Depends(get_db)):
     repo = DestinationRepository(session)
     dest = await repo.get_with_relations(destination_id)
     if not dest:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Destination not found")
     return DestinationRead(
         id=dest.id,
@@ -110,6 +111,47 @@ async def get_destination(destination_id: int, session=Depends(get_db)):
         city=dest.city.name if dest.city else None,
         country=dest.city.country.name if dest.city and dest.city.country else None,
     )
+
+
+@router.get("/destinations/{destination_id}/places", response_model=list[PlaceSummary])
+async def get_destination_places(
+    destination_id: int,
+    category: str = Query(
+        default="tourist_attraction",
+        description="restaurant | tourist_attraction | museum | park | landmark",
+    ),
+    session=Depends(get_db),
+):
+    repo = DestinationRepository(session)
+    dest = await repo.get_with_relations(destination_id)
+    if not dest:
+        raise HTTPException(status_code=404, detail="Destination not found")
+    if not dest.city:
+        return []
+
+    provider = get_places_provider()
+    results = await provider.search_places(
+        PlaceSearchCriteria(
+            city=dest.city.name,
+            country=dest.city.country.name if dest.city.country else "",
+            category=category,
+        )
+    )
+    return [
+        PlaceSummary(
+            place_id=r.place_id,
+            name=r.name,
+            category=r.category,
+            rating=r.rating,
+            review_count=r.review_count,
+            price_level=r.price_level,
+            address=r.address,
+            photo_url=r.photo_url,
+            maps_url=r.maps_url,
+            editorial_summary=r.editorial_summary,
+        )
+        for r in results
+    ]
 
 
 @router.get("/activities", response_model=list[ActivityRead])

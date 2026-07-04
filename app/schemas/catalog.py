@@ -92,6 +92,19 @@ class AccommodationRead(BaseModel):
     max_guests: int
 
 
+class PlaceSummary(BaseModel):
+    place_id: str
+    name: str
+    category: str
+    rating: Optional[float] = None
+    review_count: Optional[int] = None
+    price_level: Optional[str] = None
+    address: str = ""
+    photo_url: str = ""
+    maps_url: str = ""
+    editorial_summary: str = ""
+
+
 class FlightRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
+    # TODO: enable "Places API (New)" in Google Cloud Console and get a self-serve key —
+    # https://developers.google.com/maps/documentation/places/web-service/get-api-key.
+    # Substitutes for the TripAdvisor Content API, which requires a partner agreement
+    # with no public signup. Powers app/integrations/places (attractions, restaurants,
+    # landmarks, reviews, ratings, photos). Empty = feature disabled, no crash.
+    GOOGLE_PLACES_API_KEY: str = ""
+
     # TODO: professor will supply real Amadeus for Developers credentials —
     # https://developers.amadeus.com/my-apps. Amadeus is the sole flight and
     # hotel provider (see app/integrations/flights/factory.py and

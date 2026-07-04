@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import NotFoundError
+from app.integrations.places.base import PlaceSearchCriteria
+from app.integrations.places.factory import get_places_provider
 from app.repositories.catalog import DestinationRepository
 from app.schemas.ai_guide import AIGuideItem, AITripGuideRequest, AITripGuideResponse
 
@@ -44,6 +46,7 @@ def _valid_item(item) -> bool:
 class AITripGuideService:
     def __init__(self, session: AsyncSession):
         self.dest_repo = DestinationRepository(session)
+        self.places_provider = get_places_provider()
 
     async def generate(self, request: AITripGuideRequest) -> AITripGuideResponse:
         dest = await self.dest_repo.get_with_relations(request.destination_id)
@@ -63,7 +66,7 @@ class AITripGuideService:
                 model=settings.GROQ_MODEL,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": self._build_prompt(city, country, dest, request)},
+                    {"role": "user", "content": await self._build_prompt(city, country, dest, request)},
                 ],
                 temperature=0.7,
                 max_tokens=2000,
@@ -85,8 +88,7 @@ class AITripGuideService:
             **sections,
         )
 
-    @staticmethod
-    def _build_prompt(city: str, country: str, dest, request: AITripGuideRequest) -> str:
+    async def _build_prompt(self, city: str, country: str, dest, request: AITripGuideRequest) -> str:
         children = [m for m in request.members if m.age < 18]
         lines = [
             f"Destination: {city}, {country}.",
@@ -105,6 +107,15 @@ class AITripGuideService:
         known = [a.name for a in (dest.attractions or [])][:8]
         if known:
             lines.append(f"Already-known attractions (do not just repeat these): {', '.join(known)}.")
+
+        # Ground restaurant/attraction suggestions in real current places when available.
+        real_restaurants = await self.places_provider.search_places(
+            PlaceSearchCriteria(city=city, country=country, category="restaurant", max_results=5)
+        )
+        if real_restaurants:
+            names = ", ".join(f"{p.name} ({p.rating}★)" if p.rating else p.name for p in real_restaurants)
+            lines.append(f"Real restaurants currently operating there, for inspiration: {names}.")
+
         return "\n".join(lines)
 
     @staticmethod
