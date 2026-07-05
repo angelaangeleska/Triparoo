@@ -5,6 +5,7 @@ import {
   Euro,
   Pencil,
   Plane,
+  RefreshCw,
   Search,
   Sparkles,
   Users,
@@ -34,11 +35,13 @@ export default function PlannerPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
+  const [regenerateCount, setRegenerateCount] = useState(0)
 
-  const handleSearch = async () => {
+  const handleSearch = async (isRegenerate = false) => {
     setError('')
     setLoading(true)
     setSearched(true)
+    const nextRegenerateCount = isRegenerate ? regenerateCount + 1 : 0
     try {
       const res = await api.recommend({
         members,
@@ -47,9 +50,11 @@ export default function PlannerPage() {
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         origin_location: originLocation.trim() || undefined,
+        regenerate_count: nextRegenerateCount,
       })
       setRecommendations(res.recommendations.filter((r) => r.estimated_total_cost <= budget))
       setOriginMessage(res.origin_message || '')
+      setRegenerateCount(nextRegenerateCount)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Search failed')
     } finally {
@@ -191,7 +196,7 @@ export default function PlannerPage() {
           )}
 
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             disabled={loading || budget <= 0}
             className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold rounded-2xl hover:from-brand-600 hover:to-brand-700 disabled:opacity-60 transition-all shadow-soft text-lg"
           >
@@ -201,7 +206,9 @@ export default function PlannerPage() {
         </div>
       </FadeIn>
 
-      {loading && <LoadingSpinner message="Analyzing destinations for your family..." />}
+      {loading && recommendations.length === 0 && (
+        <LoadingSpinner message="Analyzing destinations for your family..." />
+      )}
 
       {!loading && searched && recommendations.length === 0 && !error && (
         <FadeIn>
@@ -211,12 +218,22 @@ export default function PlannerPage() {
         </FadeIn>
       )}
 
-      {!loading && recommendations.length > 0 && (
+      {recommendations.length > 0 && (
         <div className="space-y-6">
           <FadeIn>
-            <h2 className="font-display text-2xl font-bold text-brand-900">
-              Top {recommendations.length} destinations for your family
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-display text-2xl font-bold text-brand-900">
+                Top {recommendations.length} destinations for your family
+              </h2>
+              <button
+                onClick={() => handleSearch(true)}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-brand-200 bg-white text-brand-700 font-medium hover:bg-brand-50 disabled:opacity-60"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Regenerating...' : 'Regenerate'}
+              </button>
+            </div>
             {originMessage && (
               <p className="text-brand-600 text-sm mt-2 flex items-center gap-2">
                 <Plane className="w-4 h-4" />
@@ -224,19 +241,21 @@ export default function PlannerPage() {
               </p>
             )}
           </FadeIn>
-          {recommendations.map((rec, i) => (
-            <FadeIn key={rec.destination_id} delay={i * 0.08}>
-              <RecommendationCard
-                rec={rec}
-                rank={i + 1}
-                budget={budget}
-                startDate={startDate || undefined}
-                endDate={endDate || undefined}
-                partySize={members.length}
-                originLocation={originLocation.trim() || undefined}
-              />
-            </FadeIn>
-          ))}
+          <div className={loading ? 'opacity-50 pointer-events-none' : ''}>
+            {recommendations.map((rec, i) => (
+              <FadeIn key={rec.destination_id} delay={i * 0.08}>
+                <RecommendationCard
+                  rec={rec}
+                  rank={i + 1}
+                  budget={budget}
+                  startDate={startDate || undefined}
+                  endDate={endDate || undefined}
+                  partySize={members.length}
+                  originLocation={originLocation.trim() || undefined}
+                />
+              </FadeIn>
+            ))}
+          </div>
         </div>
       )}
     </div>

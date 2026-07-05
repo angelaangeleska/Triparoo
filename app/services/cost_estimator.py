@@ -81,20 +81,22 @@ class CostEstimatorService:
         start_date: date | None,
         end_date: date | None,
         preferred_month: int | None = None,
+        duration_days: int | None = None,
     ) -> tuple[date, date]:
+        nights = max(duration_days or 5, 1)
         if start_date and end_date:
             return start_date, end_date
         if start_date and not end_date:
-            return start_date, start_date + timedelta(days=5)
+            return start_date, start_date + timedelta(days=nights)
         if preferred_month:
             today = date.today()
             year = today.year
             if preferred_month < today.month or (preferred_month == today.month and today.day > 20):
                 year += 1
             start = date(year, preferred_month, 7)
-            return start, start + timedelta(days=5)
+            return start, start + timedelta(days=nights)
         start = date.today() + timedelta(days=30)
-        return start, start + timedelta(days=5)
+        return start, start + timedelta(days=nights)
 
     async def estimate_trip(
         self,
@@ -105,8 +107,11 @@ class CostEstimatorService:
         origin_location: str | None = None,
         origin_airport_id: int | None = None,
         preferred_month: int | None = None,
+        duration_days: int | None = None,
     ) -> dict:
-        start_date, end_date = self._default_trip_dates(start_date, end_date, preferred_month)
+        start_date, end_date = self._default_trip_dates(
+            start_date, end_date, preferred_month, duration_days
+        )
         nights = max((end_date - start_date).days, 1)
 
         flight_cost = 0.0

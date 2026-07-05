@@ -9,6 +9,7 @@ import {
   Euro,
   Heart,
   MapPin,
+  RefreshCw,
   Sparkles,
   Star,
   Sun,
@@ -72,6 +73,7 @@ export default function DestinationDetailPage() {
   const [itinerary, setItinerary] = useState<ItineraryDay[] | null>(null)
   const [itineraryCost, setItineraryCost] = useState(0)
   const [itineraryLoading, setItineraryLoading] = useState(false)
+  const [regenerateCount, setRegenerateCount] = useState(0)
 
   // Child activities (loaded from saved family profile)
   const [kidActivityGroups, setKidActivityGroups] = useState<KidActivityGroup[]>([])
@@ -199,19 +201,22 @@ export default function DestinationDetailPage() {
     }
   }, [tab, destId, loadKidActivities, members])
 
-  const generateItinerary = async () => {
+  const generateItinerary = async (isRegenerate = false) => {
     if (!requireAuth()) return
     setItineraryLoading(true)
     setError('')
+    const nextRegenerateCount = isRegenerate ? regenerateCount + 1 : 0
     try {
       const res = await api.itinerary({
         destination_id: destId,
         members,
         duration_days: duration,
         budget: itineraryBudget,
+        regenerate_count: nextRegenerateCount,
       })
       setItinerary(res.days)
       setItineraryCost(res.total_estimated_cost)
+      setRegenerateCount(nextRegenerateCount)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to generate itinerary')
     } finally {
@@ -412,7 +417,7 @@ export default function DestinationDetailPage() {
                     className="w-full px-3 py-2 rounded-xl border border-brand-200 bg-white" />
                 </div>
               </div>
-              <button onClick={generateItinerary} disabled={itineraryLoading}
+              <button onClick={() => generateItinerary()} disabled={itineraryLoading}
                 className="w-full py-3 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-60 flex items-center justify-center gap-2">
                 <Sparkles className="w-4 h-4" />
                 {itineraryLoading ? 'Generating...' : 'Generate itinerary'}
@@ -421,14 +426,24 @@ export default function DestinationDetailPage() {
 
             {itinerary && (
               <div>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <h2 className="font-display text-2xl font-bold text-brand-900">Your {duration}-day plan</h2>
-                  <span className="flex items-center gap-1.5 text-brand-700 font-semibold">
-                    <Euro className="w-4 h-4" />
-                    €{itineraryCost.toFixed(0)} total
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-brand-700 font-semibold">
+                      <Euro className="w-4 h-4" />
+                      {itineraryCost.toFixed(0)} activities
+                    </span>
+                    <button
+                      onClick={() => generateItinerary(true)}
+                      disabled={itineraryLoading}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-brand-200 bg-white text-brand-700 font-medium hover:bg-brand-50 disabled:opacity-60"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${itineraryLoading ? 'animate-spin' : ''}`} />
+                      {itineraryLoading ? 'Regenerating...' : 'Regenerate'}
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-4">
+                <div className={`space-y-4 ${itineraryLoading ? 'opacity-50 pointer-events-none' : ''}`}>
                   {itinerary.map((day) => (
                     <div key={day.day_number} className="glass rounded-2xl p-6">
                       <h3 className="font-display text-xl font-semibold text-brand-900 mb-4">{day.title}</h3>

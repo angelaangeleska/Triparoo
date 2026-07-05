@@ -66,6 +66,7 @@ class TripPlannerService:
             preferred_month=request.preferred_month or (request.start_date.month if request.start_date else None),
             origin_airport_id=origin_airport_id,
             origin_label=origin_label,
+            regenerate_count=request.regenerate_count,
         )
 
     @staticmethod

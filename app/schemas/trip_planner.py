@@ -17,6 +17,7 @@ class RecommendRequest(BaseModel):
     )
     origin_airport_id: Optional[int] = None
     preferred_month: Optional[int] = Field(default=None, ge=1, le=12)
+    regenerate_count: int = Field(default=0, ge=0)
 
 
 class ResolvedOriginRead(BaseModel):
@@ -195,6 +196,7 @@ class ItineraryRequest(BaseModel):
     duration_days: int = Field(ge=1, le=30)
     budget: float = Field(gt=0)
     start_date: Optional[date] = None
+    regenerate_count: int = Field(default=0, ge=0)
 
 
 class ItineraryDayItem(BaseModel):

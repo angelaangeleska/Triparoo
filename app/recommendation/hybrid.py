@@ -71,6 +71,7 @@ class HybridRecommendationService:
             start_date=context.start_date,
             end_date=context.end_date,
             destinations=dest_payload,
+            regenerate_count=context.regenerate_count,
         )
         ai_by_city = {item["city"].lower(): item for item in ai_scores}
 

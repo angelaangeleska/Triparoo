@@ -55,7 +55,7 @@ class RuleBasedScorer:
         if party_size > 4 and not any(a.family_friendly for a in destination.accommodations):
             total *= 0.9
 
-        suggested = self._pick_attractions(children, attractions)
+        suggested = self._pick_attractions(children, attractions, context.regenerate_count)
         return RuleScoreResult(total=round(total, 2), breakdown=breakdown, suggested_attractions=suggested)
 
     def _score_child_age(self, children: list[MemberContext], attractions: list[Attraction]) -> float:
@@ -147,12 +147,22 @@ class RuleBasedScorer:
                 total += self._attraction_interest_score(child, att)
         return min(100.0, (total / max(max_possible, 1)) * 100 + 20)
 
-    def _pick_attractions(self, children: list[MemberContext], attractions: list[Attraction]) -> list[Attraction]:
+    def _pick_attractions(
+        self,
+        children: list[MemberContext],
+        attractions: list[Attraction],
+        regenerate_count: int = 0,
+    ) -> list[Attraction]:
         if not children:
-            return attractions[:5]
-        scored = []
-        for att in attractions:
-            fit = sum(self._attraction_interest_score(c, att) for c in children)
-            scored.append((fit, att))
-        scored.sort(key=lambda x: -x[0])
-        return [a for _, a in scored[:5]]
+            picks = attractions[:5]
+        else:
+            scored = []
+            for att in attractions:
+                fit = sum(self._attraction_interest_score(c, att) for c in children)
+                scored.append((fit, att))
+            scored.sort(key=lambda x: -x[0])
+            picks = [a for _, a in scored]
+        if regenerate_count > 0 and len(picks) > 1:
+            offset = (regenerate_count * 2) % len(picks)
+            picks = picks[offset:] + picks[:offset]
+        return picks[:5]

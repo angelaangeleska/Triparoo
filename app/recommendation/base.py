@@ -19,6 +19,7 @@ class RecommendationContext:
     preferred_month: int | None = None
     origin_airport_id: int | None = None
     origin_label: str | None = None
+    regenerate_count: int = 0
 
 
 @dataclass

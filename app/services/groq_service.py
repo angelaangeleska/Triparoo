@@ -37,10 +37,15 @@ async def generate_itinerary_with_ai(
     members: list,
     budget: float,
     attractions: list[str],
+    real_attractions: list[dict] | None = None,
+    regenerate_count: int = 0,
 ) -> str | None:
     members_desc = []
+    youngest_age: int | None = None
     for m in members:
         age = m.get("age", "?")
+        if isinstance(age, int):
+            youngest_age = age if youngest_age is None else min(youngest_age, age)
         interests = m.get("interests", [])
         if interests:
             members_desc.append(f"age {age} (interests: {', '.join(interests)})")
@@ -48,21 +53,72 @@ async def generate_itinerary_with_ai(
             members_desc.append(f"age {age}")
     members_str = ", ".join(members_desc)
 
-    attractions_str = ", ".join(attractions[:6]) if attractions else "local attractions"
+    has_toddlers = youngest_age is not None and youngest_age <= 4
+
+    if real_attractions:
+        attraction_lines = []
+        for i, att in enumerate(real_attractions[:20], 1):
+            name = att.get("name", "Unknown")
+            category = att.get("category", "attraction")
+            description = att.get("description") or "Popular local attraction"
+            lat = att.get("latitude")
+            lon = att.get("longitude")
+            coords = f" ({lat:.4f}, {lon:.4f})" if lat is not None and lon is not None else ""
+            attraction_lines.append(
+                f"{i}. {name} [{category}]{coords} — {description[:200]}"
+            )
+        attractions_block = "\n".join(attraction_lines)
+        attractions_instruction = (
+            "Build the itinerary PRIMARILY around these REAL places from OpenStreetMap. "
+            "Use the exact place names from OpenStreetMap. Group nearby attractions on the same day "
+            "using their coordinates. Do not invent fictional venues when a real one fits."
+        )
+    else:
+        attractions_str = ", ".join(attractions[:6]) if attractions else "local attractions"
+        attractions_block = attractions_str
+        attractions_instruction = (
+            "Use the available attractions listed above, plus well-known family-friendly spots in the city."
+        )
+
+    scheduling_notes = [
+        "Consider typical opening hours — schedule indoor museums mid-morning, parks in afternoon.",
+        "Allow 20–45 minutes travel time between attractions; cluster geographically close places.",
+        "Include lunch (~12:00–13:00) and dinner (~18:30–19:30) breaks each day.",
+    ]
+    if has_toddlers:
+        scheduling_notes.append(
+            "Include a quiet rest/nap window (~12:30–14:30) for toddlers; keep afternoons lighter."
+        )
+    scheduling_block = "\n".join(f"- {note}" for note in scheduling_notes)
+
+    regenerate_block = ""
+    if regenerate_count > 0:
+        regenerate_block = (
+            f"\nThis is regeneration #{regenerate_count}. Create a FRESH itinerary with "
+            "DIFFERENT attractions and activities than a typical first pass — explore "
+            "alternative neighborhoods, lesser-known spots, and varied pacing.\n"
+        )
 
     prompt = f"""Create a detailed {duration_days}-day family travel itinerary for {city}, {country}.
-
+{regenerate_block}
 Family members: {members_str}
 Total budget: ${budget}
-Available attractions: {attractions_str}
+
+{attractions_instruction}
+
+Real attractions and activities:
+{attractions_block}
+
+Family scheduling guidelines:
+{scheduling_block}
 
 For each day provide:
-- Morning activity
-- Afternoon activity  
+- Morning activity (with approximate time, e.g. 9:30 AM)
+- Afternoon activity
 - Evening activity
 - Estimated daily cost
 
-Make it engaging, family-friendly, and realistic. Format each day clearly as "Day 1:", "Day 2:", etc."""
+Write like a professional travel guide: specific place names, logical geographic order, realistic pacing for families with children. Format each day clearly as "Day 1:", "Day 2:", etc. Use bullet points starting with "-" for each activity."""
 
     client = _get_client()
     if not client:
@@ -73,12 +129,16 @@ Make it engaging, family-friendly, and realistic. Format each day clearly as "Da
         messages=[
             {
                 "role": "system",
-                "content": "You are an expert family travel planner. Create practical, fun, and budget-conscious itineraries.",
+                "content": (
+                    "You are an expert family travel planner. Create practical, fun, and "
+                    "budget-conscious itineraries using real attractions. Prioritize geographic "
+                    "efficiency, age-appropriate pacing, and realistic daily schedules."
+                ),
             },
             {"role": "user", "content": prompt},
         ],
-        max_tokens=1500,
-        temperature=0.7,
+        max_tokens=2000,
+        temperature=min(0.7 + regenerate_count * 0.08, 0.95),
     )
 
     return response.choices[0].message.content
@@ -120,6 +180,7 @@ async def score_destinations_with_ai(
     destinations: list[dict],
     start_date: date | None = None,
     end_date: date | None = None,
+    regenerate_count: int = 0,
 ) -> list[dict]:
     """Score destinations 0-100 for a specific family using Groq."""
     client = _get_client()
@@ -134,8 +195,15 @@ async def score_destinations_with_ai(
         dest_lines.append(f"- {d['city']}, {d['country']}")
     dest_list = "\n".join(dest_lines)
 
+    regenerate_block = ""
+    if regenerate_count > 0:
+        regenerate_block = (
+            f"\nThis is regeneration #{regenerate_count}. Offer FRESH perspectives — highlight "
+            "different angles, alternative activities, and varied reasons than a typical first ranking.\n"
+        )
+
     prompt = f"""Score each destination from 0 to 100 for how well it fits THIS specific family.
-All destinations listed are already within the family's ${budget:.0f} budget — do NOT rank by price or cost.
+{regenerate_block}All destinations listed are already within the family's ${budget:.0f} budget — do NOT rank by price or cost.
 Rank by children's interests, age fit, season, and travel timing only.
 
 Family members: {members_str}
@@ -173,7 +241,7 @@ Use the exact city names from the list. Return only valid JSON, no other text.""
                 {"role": "user", "content": prompt},
             ],
             max_tokens=1500,
-            temperature=0.4,
+            temperature=min(0.4 + regenerate_count * 0.08, 0.85),
         )
         text = response.choices[0].message.content.strip()
         text = text.replace("```json", "").replace("```", "").strip()

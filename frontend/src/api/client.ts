@@ -174,6 +174,7 @@ export const api = {
     origin_location?: string
     origin_airport_id?: number
     preferred_month?: number
+    regenerate_count?: number
   }) =>
     request<{ origin_message?: string; recommendations: DestinationRecommendation[] }>(
       '/trip-planner/recommend',
@@ -212,6 +213,7 @@ export const api = {
     duration_days: number
     budget: number
     start_date?: string
+    regenerate_count?: number
   }) =>
     request<{
       destination_id: number
