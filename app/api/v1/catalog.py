@@ -10,7 +10,8 @@ from app.models.attraction import Attraction
 from app.models.country import Airport
 from app.models.flight import Flight
 from app.models.offer_cache import FlightOfferCache
-from app.repositories.catalog import AirportRepository, DestinationRepository
+from app.repositories.catalog import AirportRepository
+from app.services.destination_catalog_service import DestinationCatalogService
 from app.schemas.catalog import (
     AccommodationRead,
     ActivityRead,
@@ -78,40 +79,31 @@ async def list_attractions(
 
 
 @router.get("/destinations", response_model=list[DestinationRead])
-async def list_destinations(session=Depends(get_db)):
-    repo = DestinationRepository(session)
-    destinations = await repo.list_with_relations()
-    return [
-        DestinationRead(
-            id=d.id,
-            city_id=d.city_id,
-            description=d.description,
-            family_friendliness_score=d.family_friendliness_score,
-            popularity_score=d.popularity_score,
-            city=d.city.name if d.city else None,
-            country=d.city.country.name if d.city and d.city.country else None,
-        )
-        for d in destinations
-    ]
+async def list_destinations(
+    departure_iata: str = Query(default="SOF", min_length=3, max_length=3),
+    adults: int = Query(default=2, ge=1, le=9),
+    children: int = Query(default=0, ge=0, le=9),
+    month: int = Query(default=0, ge=0, le=12),
+    session=Depends(get_db),
+):
+    service = DestinationCatalogService(session)
+    return await service.list_destinations(
+        departure_iata=departure_iata.upper(),
+        adults=adults,
+        children=children,
+        month=month,
+    )
 
 
 @router.get("/destinations/{destination_id}", response_model=DestinationRead)
 async def get_destination(destination_id: int, session=Depends(get_db)):
-    repo = DestinationRepository(session)
-    dest = await repo.get_with_relations(destination_id)
-    if not dest:
-        from fastapi import HTTPException
+    from fastapi import HTTPException
 
+    service = DestinationCatalogService(session)
+    dest = await service.get_destination(destination_id)
+    if not dest:
         raise HTTPException(status_code=404, detail="Destination not found")
-    return DestinationRead(
-        id=dest.id,
-        city_id=dest.city_id,
-        description=dest.description,
-        family_friendliness_score=dest.family_friendliness_score,
-        popularity_score=dest.popularity_score,
-        city=dest.city.name if dest.city else None,
-        country=dest.city.country.name if dest.city and dest.city.country else None,
-    )
+    return dest
 
 
 @router.get("/activities", response_model=list[ActivityRead])

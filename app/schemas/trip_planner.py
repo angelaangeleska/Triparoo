@@ -114,6 +114,24 @@ class AccommodationSummary(BaseModel):
     source: str = "serpapi"
 
 
+class AccommodationFilterOption(BaseModel):
+    id: str
+    label: str
+
+
+class AccommodationFilterClassOption(BaseModel):
+    id: int
+    label: str
+
+
+class AccommodationFilterOptions(BaseModel):
+    stay_kinds: list[AccommodationFilterOption]
+    property_types: list[AccommodationFilterOption]
+    amenities: list[AccommodationFilterOption]
+    hotel_classes: list[AccommodationFilterClassOption]
+    min_ratings: list[AccommodationFilterClassOption]
+
+
 class DestinationRecommendation(BaseModel):
     destination_id: int
     city: str
@@ -249,6 +267,7 @@ class BudgetOptimizeRequest(BaseModel):
     budget: float = Field(gt=0)
     start_date: date
     end_date: date
+    selected_accommodation: Optional[AccommodationSummary] = None
 
 
 class BudgetAlternative(BaseModel):
@@ -256,10 +275,16 @@ class BudgetAlternative(BaseModel):
     description: str
     estimated_savings: float
     new_total: float
+    accommodation: Optional[AccommodationSummary] = None
 
 
 class BudgetOptimizeResponse(BaseModel):
     current_estimate: float
     budget: float
     within_budget: bool
-    alternatives: list[BudgetAlternative]
+    flight_cost: float = 0.0
+    accommodation_cost: float = 0.0
+    activity_cost: float = 0.0
+    nights: int = 0
+    selected_accommodation: Optional[AccommodationSummary] = None
+    alternatives: list[BudgetAlternative] = []

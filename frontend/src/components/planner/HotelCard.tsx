@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bed, ExternalLink, Star, Wifi } from 'lucide-react'
+import { Bed, Check, ExternalLink, Star, Wifi } from 'lucide-react'
 import type { AccommodationSummary } from '../../types'
 
 function formatMoney(amount: number, currency = 'USD') {
@@ -13,16 +13,32 @@ function formatMoney(amount: number, currency = 'USD') {
 
 interface Props {
   hotel: AccommodationSummary
+  selected?: boolean
+  onSelect?: () => void
+  selectLabel?: string
+  showSelect?: boolean
+  disabled?: boolean
 }
 
-export default function HotelCard({ hotel }: Props) {
+export default function HotelCard({
+  hotel,
+  selected = false,
+  onSelect,
+  selectLabel = 'Select',
+  showSelect = false,
+  disabled = false,
+}: Props) {
   const [imageFailed, setImageFailed] = useState(false)
   const primarySource = hotel.booking_sources[0] ?? null
   const bookingUrl = primarySource?.url || hotel.google_url
   const showImage = Boolean(hotel.image_url) && !imageFailed
 
   return (
-    <div className="rounded-xl border border-brand-100 bg-white/80 overflow-hidden">
+    <div
+      className={`rounded-xl border bg-white/80 overflow-hidden transition-shadow ${
+        selected ? 'border-brand-500 ring-2 ring-brand-300 shadow-soft' : 'border-brand-100'
+      }`}
+    >
       <div className="flex gap-0 min-h-[7rem]">
         <div className="w-28 shrink-0 relative bg-brand-50">
           {showImage ? (
@@ -80,6 +96,21 @@ export default function HotelCard({ hotel }: Props) {
           )}
 
           <div className="flex flex-wrap items-center gap-2">
+            {showSelect && onSelect && (
+              <button
+                type="button"
+                onClick={onSelect}
+                disabled={disabled}
+                className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium transition-colors disabled:opacity-60 ${
+                  selected
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-brand-100 text-brand-800 hover:bg-brand-200'
+                }`}
+              >
+                {selected ? <Check className="w-3 h-3" /> : null}
+                {selected ? 'Selected' : selectLabel}
+              </button>
+            )}
             {hotel.booking_sources.slice(0, 3).map((src) => (
               <a
                 key={src.name}

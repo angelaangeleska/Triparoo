@@ -8,6 +8,7 @@ from datetime import datetime
 import httpx
 
 from app.core.config import settings
+from app.integrations.amadeus.client import get_amadeus_client
 from app.integrations.flights.airline_names import airline_name
 from app.integrations.flights.base import FlightOffer, FlightSearchCriteria
 from app.services.airport_catalog import get_airport_catalog
@@ -20,28 +21,12 @@ class AmadeusFlightProvider:
 
     def __init__(self, session=None):
         self.session = session
-        self._token: str | None = None
+        self.client = get_amadeus_client()
         self.catalog = get_airport_catalog()
 
     @property
     def enabled(self) -> bool:
-        return bool(settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET)
-
-    async def _get_token(self, client: httpx.AsyncClient) -> str:
-        if self._token:
-            return self._token
-        resp = await client.post(
-            f"{settings.AMADEUS_BASE_URL}/v1/security/oauth2/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": settings.AMADEUS_CLIENT_ID,
-                "client_secret": settings.AMADEUS_CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        resp.raise_for_status()
-        self._token = resp.json()["access_token"]
-        return self._token
+        return self.client.enabled
 
     @staticmethod
     def _parse_iso_datetime(value: str) -> datetime:
@@ -176,48 +161,40 @@ class AmadeusFlightProvider:
             return []
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
-                token = await self._get_token(client)
-                params: dict = {
-                    "originLocationCode": origin,
-                    "destinationLocationCode": dest,
-                    "departureDate": criteria.departure_date.isoformat(),
-                    "adults": criteria.party_size,
-                    "max": 8,
-                    "currencyCode": "EUR",
-                    "nonStop": "false",
-                }
-                if criteria.return_date:
-                    params["returnDate"] = criteria.return_date.isoformat()
+            params: dict = {
+                "originLocationCode": origin,
+                "destinationLocationCode": dest,
+                "departureDate": criteria.departure_date.isoformat(),
+                "adults": criteria.party_size,
+                "max": 8,
+                "currencyCode": "EUR",
+                "nonStop": "false",
+            }
+            if criteria.return_date:
+                params["returnDate"] = criteria.return_date.isoformat()
 
-                resp = await client.get(
-                    f"{settings.AMADEUS_BASE_URL}/v2/shopping/flight-offers",
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
+            resp = await self.client.get("/v2/shopping/flight-offers", params=params)
+            if resp.status_code == 401:
+                logger.error("Amadeus token expired or invalid")
+            elif resp.status_code != 200:
+                logger.warning("Amadeus API error %s: %s", resp.status_code, resp.text[:200])
 
-                if resp.status_code == 401:
-                    self._token = None
-                    logger.error("Amadeus token expired or invalid")
-                elif resp.status_code != 200:
-                    logger.warning("Amadeus API error %s: %s", resp.status_code, resp.text[:200])
-
-                if resp.status_code == 200:
-                    data = resp.json()
-                    offers: list[FlightOffer] = []
-                    for item in data.get("data", [])[:8]:
-                        parsed = self._parse_offer(item, criteria)
-                        if parsed:
-                            offers.append(parsed)
-                    if offers:
-                        logger.info(
-                            "Amadeus: %d live offers %s→%s on %s",
-                            len(offers),
-                            origin,
-                            dest,
-                            criteria.departure_date,
-                        )
-                        return sorted(offers, key=lambda o: o.price)
+            if resp.status_code == 200:
+                data = resp.json()
+                offers: list[FlightOffer] = []
+                for item in data.get("data", [])[:8]:
+                    parsed = self._parse_offer(item, criteria)
+                    if parsed:
+                        offers.append(parsed)
+                if offers:
+                    logger.info(
+                        "Amadeus: %d live offers %s→%s on %s",
+                        len(offers),
+                        origin,
+                        dest,
+                        criteria.departure_date,
+                    )
+                    return sorted(offers, key=lambda o: o.price)
         except httpx.HTTPError as exc:
             logger.error("Amadeus HTTP error: %s", exc)
         except Exception as exc:

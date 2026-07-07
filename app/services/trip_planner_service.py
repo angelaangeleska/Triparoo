@@ -117,6 +117,9 @@ class TripPlannerService:
             destinations, origin_airport_ids, resolved, origin_iatas
         )
         eligible = [d for d in destinations if d.id not in excluded]
+        if request.regenerate_count > 0 and len(eligible) > 1:
+            offset = request.regenerate_count % len(eligible)
+            eligible = eligible[offset:] + eligible[:offset]
         context = self._to_context(request, origin_airport_id, origin_label)
         party_size = len(request.members)
 

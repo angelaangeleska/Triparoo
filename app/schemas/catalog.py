@@ -50,6 +50,14 @@ class DestinationRead(BaseModel):
     popularity_score: float
     city: Optional[str] = None
     country: Optional[str] = None
+    thumbnail: Optional[str] = None
+    flight_price: Optional[float] = None
+    hotel_price: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    airline: Optional[str] = None
+    destination_airport_code: Optional[str] = None
+    source: str = "db"
 
 
 class AttractionRead(BaseModel):

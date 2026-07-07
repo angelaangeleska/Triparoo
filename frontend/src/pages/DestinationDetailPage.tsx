@@ -22,15 +22,18 @@ import { isKid, useFamily } from '../context/FamilyContext'
 import type {
   AccommodationSummary,
   Attraction,
-  BudgetAlternative,
   CheapestPeriod,
   ChildActivity,
   Destination,
   ItineraryDay,
+  AccommodationSearchFilters,
+  TripBudgetResult,
 } from '../types'
 import HotelCard from '../components/planner/HotelCard'
+import AccommodationFilters from '../components/planner/AccommodationFilters'
+import SelectedTripBudget from '../components/planner/SelectedTripBudget'
 import OriginLocationInput from '../components/planner/OriginLocationInput'
-import { MONTHS } from '../types'
+import { MONTHS, DEFAULT_ACCOMMODATION_FILTERS, hotelKey } from '../types'
 import CityImage from '../components/ui/CityImage'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import FadeIn from '../components/ui/FadeIn'
@@ -64,6 +67,10 @@ export default function DestinationDetailPage() {
   const [attractions, setAttractions] = useState<Attraction[]>([])
   const [hotels, setHotels] = useState<AccommodationSummary[]>([])
   const [hotelsLoading, setHotelsLoading] = useState(false)
+  const [hotelFilters, setHotelFilters] = useState<AccommodationSearchFilters>(DEFAULT_ACCOMMODATION_FILTERS)
+  const [hotelCheckIn, setHotelCheckIn] = useState('')
+  const [hotelCheckOut, setHotelCheckOut] = useState('')
+  const [hotelAdults, setHotelAdults] = useState(2)
   const [tab, setTab] = useState<Tab>('overview')
   const [loading, setLoading] = useState(true)
 
@@ -89,12 +96,10 @@ export default function DestinationDetailPage() {
   const [datesSearched, setDatesSearched] = useState(false)
 
   // Budget
-  const [budgetResult, setBudgetResult] = useState<{
-    current_estimate: number
-    budget: number
-    within_budget: boolean
-    alternatives: BudgetAlternative[]
-  } | null>(null)
+  const [selectedHotel, setSelectedHotel] = useState<AccommodationSummary | null>(null)
+  const [tripBudget, setTripBudget] = useState<TripBudgetResult | null>(null)
+  const [budgetLoading, setBudgetLoading] = useState(false)
+  const [budgetResult, setBudgetResult] = useState<TripBudgetResult | null>(null)
 
   const [error, setError] = useState('')
   const [hotelsError, setHotelsError] = useState('')
@@ -113,6 +118,8 @@ export default function DestinationDetailPage() {
     return `${y}-${m}-${day}`
   }
 
+  const tripBudgetAmount = tripState?.budget ?? itineraryBudget
+
   const requireAuth = () => {
     if (!isAuthenticated) {
       navigate('/login')
@@ -121,27 +128,91 @@ export default function DestinationDetailPage() {
     return true
   }
 
+  const evaluateHotelSelection = useCallback(async (hotel: AccommodationSummary | null) => {
+    if (!requireAuth()) return
+    setBudgetLoading(true)
+    setHotelsError('')
+    try {
+      const res = await api.budgetOptimize({
+        destination_id: destId,
+        origin_location: datesOrigin.trim() || tripState?.originLocation || undefined,
+        members,
+        budget: tripBudgetAmount,
+        start_date: tripState?.startDate || hotelCheckIn || localDateOffset(30),
+        end_date: tripState?.endDate || hotelCheckOut || localDateOffset(37),
+        selected_accommodation: hotel,
+      })
+      setTripBudget(res)
+      setBudgetResult(res)
+      if (hotel) setSelectedHotel(hotel)
+    } catch (err) {
+      setHotelsError(err instanceof ApiError ? err.message : 'Could not update trip budget')
+    } finally {
+      setBudgetLoading(false)
+    }
+  }, [
+    destId,
+    datesOrigin,
+    tripState?.originLocation,
+    tripState?.startDate,
+    tripState?.endDate,
+    members,
+    tripBudgetAmount,
+    hotelCheckIn,
+    hotelCheckOut,
+    isAuthenticated,
+    navigate,
+  ])
+
+  const handleSelectHotel = (hotel: AccommodationSummary) => {
+    void evaluateHotelSelection(hotel)
+  }
+
+  const hotelAlternatives = (tripBudget?.alternatives ?? []).filter(
+    (alt) => alt.type === 'cheaper_accommodation' && alt.accommodation,
+  )
+
+  const loadHotels = useCallback(async (dest: Destination, filters = hotelFilters) => {
+    const city = dest.city
+    if (!city) return
+    const checkIn = hotelCheckIn || tripState?.startDate || localDateOffset(30)
+    const checkOut = hotelCheckOut || tripState?.endDate || localDateOffset(35)
+    const adults = hotelAdults || tripState?.partySize || 2
+    setHotelsLoading(true)
+    setHotelsError('')
+    try {
+      const results = await api.searchHotels(
+        city,
+        checkIn,
+        checkOut,
+        adults,
+        0,
+        dest.country || '',
+        filters,
+      )
+      setHotels(results)
+    } catch (err) {
+      console.error('Hotels error:', err)
+      setHotels([])
+      setHotelsError(err instanceof ApiError ? err.message : 'Could not load accommodations')
+    } finally {
+      setHotelsLoading(false)
+    }
+  }, [hotelAdults, hotelCheckIn, hotelCheckOut, hotelFilters, tripState?.endDate, tripState?.partySize, tripState?.startDate])
+
   useEffect(() => {
     if (!destId) return
     Promise.all([api.destination(destId), api.attractions(destId)])
       .then(([dest, att]) => {
         setDestination(dest)
         setAttractions(att)
-        const city = dest.city
-        const country = dest.country
-        if (!city) return
         const checkIn = tripState?.startDate || localDateOffset(30)
         const checkOut = tripState?.endDate || localDateOffset(35)
         const adults = tripState?.partySize ?? 2
-        setHotelsLoading(true)
-        setHotelsError('')
-        api.searchHotels(city, checkIn, checkOut, adults, 0, country || '')
-          .then(setHotels)
-          .catch((err) => {
-            console.error('Hotels error:', err)
-            setHotelsError(err instanceof ApiError ? err.message : 'Could not load hotels')
-          })
-          .finally(() => setHotelsLoading(false))
+        setHotelCheckIn(checkIn)
+        setHotelCheckOut(checkOut)
+        setHotelAdults(adults)
+        loadHotels(dest, DEFAULT_ACCOMMODATION_FILTERS)
       })
       .catch(() => setError('Destination not found'))
       .finally(() => setLoading(false))
@@ -251,20 +322,7 @@ export default function DestinationDetailPage() {
 
   const loadBudget = async () => {
     if (!requireAuth()) return
-    setError('')
-    try {
-      const res = await api.budgetOptimize({
-        destination_id: destId,
-        origin_location: datesOrigin.trim() || tripState?.originLocation || undefined,
-        members,
-        budget: tripState?.budget ?? itineraryBudget,
-        start_date: tripState?.startDate || localDateOffset(30),
-        end_date: tripState?.endDate || localDateOffset(37),
-      })
-      setBudgetResult(res)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to optimize budget')
-    }
+    await evaluateHotelSelection(selectedHotel)
   }
 
   const tabs: { key: Tab; label: string; icon: typeof MapPin }[] = [
@@ -379,9 +437,19 @@ export default function DestinationDetailPage() {
               <div>
                 <h2 className="font-display text-2xl font-bold text-brand-900 mb-4 flex items-center gap-2">
                   <Bed className="w-6 h-6 text-brand-500" />
-                  Hotels
+                  {hotelFilters.stay_kind === 'vacation_rental' ? 'Apartments & rentals' : 'Hotels'}
                 </h2>
-                {hotelsLoading && <LoadingSpinner message="Finding hotels..." />}
+
+                {destination && (
+                  <AccommodationFilters
+                    value={hotelFilters}
+                    onChange={setHotelFilters}
+                    onApply={() => loadHotels(destination, hotelFilters)}
+                    loading={hotelsLoading}
+                  />
+                )}
+
+                {hotelsLoading && <LoadingSpinner message="Finding places to stay..." />}
                 {hotelsError && (
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3">
                     {hotelsError}
@@ -389,11 +457,51 @@ export default function DestinationDetailPage() {
                 )}
                 {!hotelsLoading && hotels.length > 0 && (
                   <div className="space-y-3">
-                    {hotels.map((h, i) => <HotelCard key={i} hotel={h} />)}
+                    {selectedHotel && tripBudget && (
+                      <div className="mb-4 space-y-4">
+                        <SelectedTripBudget result={tripBudget} />
+                        {!tripBudget.within_budget && hotelAlternatives.length > 0 && (
+                          <div className="rounded-2xl border border-sunset-200 bg-white/80 p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-brand-900">Within your budget — select instead:</h3>
+                            {hotelAlternatives.map((alt) => (
+                              <div key={hotelKey(alt.accommodation!)} className="space-y-2">
+                                <HotelCard
+                                  hotel={alt.accommodation!}
+                                  showSelect
+                                  selectLabel="Select instead"
+                                  selected={selectedHotel ? hotelKey(selectedHotel) === hotelKey(alt.accommodation!) : false}
+                                  onSelect={() => handleSelectHotel(alt.accommodation!)}
+                                  disabled={budgetLoading}
+                                />
+                                <p className="text-xs text-emerald-700 px-1">
+                                  New total €{alt.new_total.toFixed(0)} · save €{alt.estimated_savings.toFixed(0)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {hotels.map((h) => (
+                      <HotelCard
+                        key={hotelKey(h)}
+                        hotel={h}
+                        showSelect={isAuthenticated}
+                        selected={selectedHotel ? hotelKey(selectedHotel) === hotelKey(h) : false}
+                        onSelect={() => handleSelectHotel(h)}
+                        disabled={budgetLoading}
+                      />
+                    ))}
+                    {!isAuthenticated && (
+                      <p className="text-xs text-brand-500 text-center pt-2">
+                        <Link to="/login" className="text-brand-700 font-medium hover:underline">Sign in</Link>
+                        {' '}to select a hotel and track your trip budget.
+                      </p>
+                    )}
                   </div>
                 )}
                 {!hotelsLoading && !hotelsError && hotels.length === 0 && (
-                  <p className="text-sm text-brand-500 text-center py-6">No hotels found for these dates.</p>
+                  <p className="text-sm text-brand-500 text-center py-6">No places found for these dates and filters.</p>
                 )}
               </div>
             </div>
@@ -649,45 +757,67 @@ export default function DestinationDetailPage() {
         {/* Budget */}
         {tab === 'budget' && (
           <FadeIn>
-            {!budgetResult ? (
-              <LoadingSpinner message="Calculating budget options..." />
-            ) : (
+            {budgetLoading && !budgetResult ? (
+              <LoadingSpinner message="Calculating budget..." />
+            ) : budgetResult ? (
               <div>
-                <div className={`glass rounded-2xl p-6 mb-8 ${budgetResult.within_budget ? 'ring-2 ring-emerald-400' : 'ring-2 ring-sunset-400'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-brand-600">Current estimate</p>
-                      <p className="text-3xl font-bold text-brand-900">€{budgetResult.current_estimate.toFixed(0)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-brand-600">Your budget</p>
-                      <p className="text-3xl font-bold text-brand-900">€{budgetResult.budget.toFixed(0)}</p>
-                    </div>
-                  </div>
-                  <p className={`mt-3 text-sm font-medium ${budgetResult.within_budget ? 'text-emerald-600' : 'text-sunset-600'}`}>
-                    {budgetResult.within_budget ? '✓ Within budget' : '⚠ Over budget — see alternatives below'}
-                  </p>
-                </div>
+                <SelectedTripBudget result={budgetResult} />
 
-                {budgetResult.alternatives.length > 0 && (
-                  <div>
-                    <h2 className="font-display text-xl font-bold text-brand-900 mb-4">Ways to save</h2>
-                    <div className="space-y-3">
-                      {budgetResult.alternatives.map((alt, i) => (
-                        <div key={i} className="glass rounded-xl p-5 flex justify-between items-center gap-4">
-                          <div>
-                            <p className="font-medium text-brand-900">{alt.description}</p>
-                            <p className="text-xs text-brand-500 capitalize mt-0.5">{alt.type.replace('_', ' ')}</p>
-                          </div>
-                          <div className="text-right whitespace-nowrap">
-                            <p className="text-sm font-bold text-emerald-600">Save €{alt.estimated_savings.toFixed(0)}</p>
-                            <p className="text-xs text-brand-600">New total: €{alt.new_total.toFixed(0)}</p>
-                          </div>
+                {selectedHotel && !budgetResult.within_budget && hotelAlternatives.length > 0 && (
+                  <div className="mt-8">
+                    <h2 className="font-display text-xl font-bold text-brand-900 mb-4">Cheaper stays that fit your budget</h2>
+                    <div className="space-y-4">
+                      {hotelAlternatives.map((alt) => (
+                        <div key={hotelKey(alt.accommodation!)}>
+                          <HotelCard
+                            hotel={alt.accommodation!}
+                            showSelect
+                            selectLabel="Select instead"
+                            selected={hotelKey(selectedHotel) === hotelKey(alt.accommodation!)}
+                            onSelect={() => handleSelectHotel(alt.accommodation!)}
+                            disabled={budgetLoading}
+                          />
+                          <p className="text-xs text-emerald-700 mt-2 px-1">
+                            Total trip €{alt.new_total.toFixed(0)} · save €{alt.estimated_savings.toFixed(0)}
+                          </p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+
+                {budgetResult.alternatives.filter((a) => a.type !== 'cheaper_accommodation').length > 0 && (
+                  <div className="mt-8">
+                    <h2 className="font-display text-xl font-bold text-brand-900 mb-4">Other ways to save</h2>
+                    <div className="space-y-3">
+                      {budgetResult.alternatives
+                        .filter((a) => a.type !== 'cheaper_accommodation')
+                        .map((alt, i) => (
+                          <div key={i} className="glass rounded-xl p-5 flex justify-between items-center gap-4">
+                            <div>
+                              <p className="font-medium text-brand-900">{alt.description}</p>
+                              <p className="text-xs text-brand-500 capitalize mt-0.5">{alt.type.replace('_', ' ')}</p>
+                            </div>
+                            <div className="text-right whitespace-nowrap">
+                              <p className="text-sm font-bold text-emerald-600">Save €{alt.estimated_savings.toFixed(0)}</p>
+                              <p className="text-xs text-brand-600">New total: €{alt.new_total.toFixed(0)}</p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="glass rounded-2xl p-8 text-center max-w-lg mx-auto">
+                <p className="text-brand-700 mb-4">Select a hotel on the Overview tab to personalize your trip budget.</p>
+                <button
+                  type="button"
+                  onClick={() => setTab('overview')}
+                  className="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600"
+                >
+                  Browse hotels
+                </button>
               </div>
             )}
           </FadeIn>

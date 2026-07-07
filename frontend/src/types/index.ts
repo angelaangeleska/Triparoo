@@ -28,6 +28,14 @@ export interface Destination {
   popularity_score: number
   city?: string
   country?: string
+  thumbnail?: string
+  flight_price?: number
+  hotel_price?: number
+  start_date?: string
+  end_date?: string
+  airline?: string
+  destination_airport_code?: string
+  source?: string
 }
 
 export interface Airport {
@@ -158,6 +166,42 @@ export interface AccommodationSummary {
   source: string
 }
 
+export interface AccommodationFilterOption {
+  id: string
+  label: string
+}
+
+export interface AccommodationFilterClassOption {
+  id: number
+  label: string
+}
+
+export interface AccommodationFilterOptions {
+  stay_kinds: AccommodationFilterOption[]
+  property_types: AccommodationFilterOption[]
+  amenities: AccommodationFilterOption[]
+  hotel_classes: AccommodationFilterClassOption[]
+  min_ratings: AccommodationFilterClassOption[]
+}
+
+export interface AccommodationSearchFilters {
+  stay_kind: string
+  property_types: string[]
+  amenities: string[]
+  hotel_class: number[]
+  min_rating: number | null
+  free_cancellation: boolean
+}
+
+export const DEFAULT_ACCOMMODATION_FILTERS: AccommodationSearchFilters = {
+  stay_kind: 'hotel',
+  property_types: [],
+  amenities: [],
+  hotel_class: [],
+  min_rating: null,
+  free_cancellation: false,
+}
+
 export interface DestinationRecommendation {
   destination_id: number
   city: string
@@ -219,6 +263,23 @@ export interface BudgetAlternative {
   description: string
   estimated_savings: number
   new_total: number
+  accommodation?: AccommodationSummary | null
+}
+
+export interface TripBudgetResult {
+  current_estimate: number
+  budget: number
+  within_budget: boolean
+  flight_cost: number
+  accommodation_cost: number
+  activity_cost: number
+  nights: number
+  selected_accommodation?: AccommodationSummary | null
+  alternatives: BudgetAlternative[]
+}
+
+export function hotelKey(h: AccommodationSummary): string {
+  return `${h.name}|${h.total_price}`
 }
 
 export const MONTHS = [

@@ -1,10 +1,13 @@
 import type {
   Accommodation,
+  AccommodationFilterOptions,
+  AccommodationSearchFilters,
   AccommodationSummary,
   Airport,
   AirportSearchResult,
   Attraction,
   BudgetAlternative,
+  TripBudgetResult,
   CheapestPeriod,
   ChildActivity,
   Destination,
@@ -143,7 +146,20 @@ export const api = {
 
   me: () => request<User>('/auth/me'),
 
-  destinations: () => request<Destination[]>('/destinations'),
+  destinations: (params?: {
+    departure_iata?: string
+    adults?: number
+    children?: number
+    month?: number
+  }) => {
+    const qs = new URLSearchParams()
+    if (params?.departure_iata) qs.set('departure_iata', params.departure_iata)
+    if (params?.adults != null) qs.set('adults', String(params.adults))
+    if (params?.children != null) qs.set('children', String(params.children))
+    if (params?.month != null) qs.set('month', String(params.month))
+    const query = qs.toString()
+    return request<Destination[]>(`/destinations${query ? `?${query}` : ''}`)
+  },
 
   destination: (id: number) => request<Destination>(`/destinations/${id}`),
 
@@ -161,10 +177,40 @@ export const api = {
   accommodations: (destinationId?: number) =>
     request<Accommodation[]>(`/accommodations${destinationId ? `?destination_id=${destinationId}` : ''}`),
 
-  searchHotels: (city: string, checkIn: string, checkOut: string, adults = 2, children = 0, country = '') =>
-    request<AccommodationSummary[]>(
-      `/trip-planner/hotels?city=${encodeURIComponent(city)}&check_in=${checkIn}&check_out=${checkOut}&adults=${adults}&children=${children}${country ? `&country=${encodeURIComponent(country)}` : ''}`
-    ),
+  accommodationFilters: () => request<AccommodationFilterOptions>('/trip-planner/accommodation-filters'),
+
+  searchHotels: (
+    city: string,
+    checkIn: string,
+    checkOut: string,
+    adults = 2,
+    children = 0,
+    country = '',
+    filters: AccommodationSearchFilters = {
+      stay_kind: 'hotel',
+      property_types: [],
+      amenities: [],
+      hotel_class: [],
+      min_rating: null,
+      free_cancellation: false,
+    },
+  ) => {
+    const params = new URLSearchParams({
+      city,
+      check_in: checkIn,
+      check_out: checkOut,
+      adults: String(adults),
+      children: String(children),
+      stay_kind: filters.stay_kind,
+      free_cancellation: String(filters.free_cancellation),
+    })
+    if (country) params.set('country', country)
+    if (filters.property_types.length) params.set('property_types', filters.property_types.join(','))
+    if (filters.amenities.length) params.set('amenities', filters.amenities.join(','))
+    if (filters.hotel_class.length) params.set('hotel_class', filters.hotel_class.join(','))
+    if (filters.min_rating) params.set('min_rating', String(filters.min_rating))
+    return request<AccommodationSummary[]>(`/trip-planner/hotels?${params.toString()}`)
+  },
 
   recommend: (data: {
     members: TripMember[]
@@ -242,13 +288,8 @@ export const api = {
     budget: number
     start_date: string
     end_date: string
-  }) =>
-    request<{
-      current_estimate: number
-      budget: number
-      within_budget: boolean
-      alternatives: BudgetAlternative[]
-    }>('/trip-planner/budget-optimize', { method: 'POST', body: JSON.stringify(data) }),
+    selected_accommodation?: AccommodationSummary | null
+  }) => request<TripBudgetResult>('/trip-planner/budget-optimize', { method: 'POST', body: JSON.stringify(data) }),
     
     chat: (data: {
     message: string

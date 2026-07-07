@@ -243,7 +243,7 @@ export default function PlannerPage() {
           </FadeIn>
           <div className={loading ? 'opacity-50 pointer-events-none' : ''}>
             {recommendations.map((rec, i) => (
-              <FadeIn key={rec.destination_id} delay={i * 0.08}>
+              <FadeIn key={`${rec.destination_id}-${regenerateCount}-${i}`} delay={i * 0.08}>
                 <RecommendationCard
                   rec={rec}
                   rank={i + 1}

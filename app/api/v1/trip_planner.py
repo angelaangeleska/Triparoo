@@ -8,9 +8,16 @@ from app.core.config import settings
 from app.core.exceptions import AppException, NotFoundError
 from app.integrations.accommodations.base import AccommodationSearchCriteria
 from app.integrations.accommodations.factory import get_accommodation_provider
+from app.integrations.accommodations.filters import (
+    AMENITY_IDS,
+    PROPERTY_TYPE_IDS,
+    accommodation_filter_options,
+    normalize_filter_keys,
+)
 from app.integrations.accommodations.serialize import accommodation_to_dict
 from app.models.user import User
 from app.schemas.trip_planner import (
+    AccommodationFilterOptions,
     AccommodationSummary,
     BookingSourceSummary,
     BudgetOptimizeRequest,
@@ -58,6 +65,63 @@ def _to_accommodation_summary(data: dict) -> AccommodationSummary:
     )
 
 
+def _split_csv(value: str) -> list[str]:
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _build_accommodation_criteria(
+    *,
+    city: str,
+    check_in: date,
+    check_out: date,
+    adults: int,
+    children: int,
+    country: str,
+    stay_kind: str,
+    property_types: str,
+    amenities: str,
+    hotel_class: str,
+    min_rating: int | None,
+    free_cancellation: bool,
+) -> AccommodationSearchCriteria:
+    kind = stay_kind.strip().lower() if stay_kind else "hotel"
+    if kind not in ("hotel", "vacation_rental"):
+        kind = "hotel"
+
+    classes: list[int] = []
+    for part in _split_csv(hotel_class):
+        try:
+            star = int(part)
+            if star in (2, 3, 4, 5):
+                classes.append(star)
+        except ValueError:
+            continue
+
+    rating = min_rating if min_rating in (7, 8, 9) else None
+
+    return AccommodationSearchCriteria(
+        city=city,
+        check_in=check_in,
+        check_out=check_out,
+        adults=adults,
+        children=children,
+        country=country,
+        stay_kind=kind,
+        property_types=normalize_filter_keys(_split_csv(property_types), PROPERTY_TYPE_IDS),
+        amenities=normalize_filter_keys(_split_csv(amenities), AMENITY_IDS),
+        hotel_class=classes,
+        min_rating=rating,
+        free_cancellation=free_cancellation,
+    )
+
+
+@router.get("/accommodation-filters", response_model=AccommodationFilterOptions)
+async def list_accommodation_filters():
+    """Booking-style filter options for hotel / apartment search."""
+    data = accommodation_filter_options()
+    return AccommodationFilterOptions(**data)
+
+
 @router.get("/hotels", response_model=list[AccommodationSummary])
 async def search_hotels(
     city: str = Query(description="City name, e.g. Prague"),
@@ -66,23 +130,34 @@ async def search_hotels(
     adults: int = Query(default=2, ge=1),
     children: int = Query(default=0, ge=0),
     country: str = Query(default="", description="Country name for more accurate results"),
+    stay_kind: str = Query(default="hotel", description="hotel or vacation_rental"),
+    property_types: str = Query(default="", description="Comma-separated property type keys, e.g. resort,boutique"),
+    amenities: str = Query(default="", description="Comma-separated amenity keys, e.g. pool,free_parking,wifi"),
+    hotel_class: str = Query(default="", description="Comma-separated star ratings, e.g. 3,4,5"),
+    min_rating: int | None = Query(default=None, description="SerpAPI rating filter: 7=3.5+, 8=4.0+, 9=4.5+"),
+    free_cancellation: bool = Query(default=False),
     session=Depends(get_db),
 ):
     if not settings.SERPAPI_API_KEY and not settings.should_use_db_prices():
         raise HTTPException(status_code=503, detail="Hotel search is not configured (missing SERPAPI_API_KEY)")
 
     provider = get_accommodation_provider(session)
+    criteria = _build_accommodation_criteria(
+        city=city,
+        check_in=check_in,
+        check_out=check_out,
+        adults=adults,
+        children=children,
+        country=country,
+        stay_kind=stay_kind,
+        property_types=property_types,
+        amenities=amenities,
+        hotel_class=hotel_class,
+        min_rating=min_rating,
+        free_cancellation=free_cancellation,
+    )
     try:
-        offers = await provider.search(
-            AccommodationSearchCriteria(
-                city=city,
-                check_in=check_in,
-                check_out=check_out,
-                adults=adults,
-                children=children,
-                country=country,
-            )
-        )
+        offers = await provider.search(criteria)
         return [_to_accommodation_summary(accommodation_to_dict(o)) for o in offers]
     except Exception as exc:
         logger.exception("Hotel search failed")

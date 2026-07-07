@@ -29,11 +29,11 @@ services:
       DEBUG: "true"
       CORS_ORIGINS: "http://localhost:5180,http://localhost:3000,http://127.0.0.1:5180"
       SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
-      FLIGHT_PROVIDER: ${FLIGHT_PROVIDER:-auto}
+      FLIGHT_PROVIDER: ${FLIGHT_PROVIDER:-serpapi}
       ACCOMMODATION_PROVIDER: ${ACCOMMODATION_PROVIDER:-serpapi}
       AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID:-}
       AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET:-}
-      USE_DB_PRICES: ${USE_DB_PRICES:-true}
+      USE_DB_PRICES: ${USE_DB_PRICES:-false}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
     depends_on:
       db:

@@ -11,6 +11,12 @@ class AccommodationSearchCriteria:
     adults: int = 2
     children: int = 0
     country: str = ""
+    stay_kind: str = "hotel"
+    property_types: list[str] = field(default_factory=list)
+    amenities: list[str] = field(default_factory=list)
+    hotel_class: list[int] = field(default_factory=list)
+    min_rating: int | None = None
+    free_cancellation: bool = False
 
 
 @dataclass

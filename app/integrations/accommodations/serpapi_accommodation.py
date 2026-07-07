@@ -13,6 +13,7 @@ from app.integrations.accommodations.base import (
     AccommodationSearchCriteria,
     BookingSource,
 )
+from app.integrations.accommodations.filters import encode_amenities, encode_property_types
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +132,16 @@ class SerpApiAccommodationProvider:
             return []
 
         nights = max((criteria.check_out - criteria.check_in).days, 1)
-        if criteria.country:
+        stay_kind = (criteria.stay_kind or "hotel").lower()
+        if stay_kind == "vacation_rental":
+            query = f"vacation rentals in {criteria.city}"
+            if criteria.country:
+                query = f"vacation rentals in {criteria.city}, {criteria.country}"
+        elif criteria.country:
             query = f"Hotels in {criteria.city}, {criteria.country}"
         else:
             query = f"hotels in {criteria.city}"
+
         params: dict = {
             "engine": "google_hotels",
             "q": query,
@@ -148,6 +155,25 @@ class SerpApiAccommodationProvider:
         }
         if criteria.children > 0:
             params["children"] = criteria.children
+        if stay_kind == "vacation_rental":
+            params["vacation_rentals"] = "true"
+
+        property_types = encode_property_types(criteria.property_types)
+        if property_types and stay_kind != "vacation_rental":
+            params["property_types"] = property_types
+
+        amenities = encode_amenities(criteria.amenities)
+        if amenities:
+            params["amenities"] = amenities
+
+        if criteria.hotel_class and stay_kind != "vacation_rental":
+            params["hotel_class"] = ",".join(str(c) for c in sorted(set(criteria.hotel_class)))
+
+        if criteria.min_rating in (7, 8, 9):
+            params["rating"] = criteria.min_rating
+
+        if criteria.free_cancellation and stay_kind != "vacation_rental":
+            params["free_cancellation"] = "true"
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:

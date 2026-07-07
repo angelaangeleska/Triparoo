@@ -46,7 +46,12 @@ class HybridRecommendationService:
             )
 
         scored.sort(key=lambda s: s.rule_score, reverse=True)
-        top = scored[:10]
+        pool_size = min(len(scored), 15)
+        pool = scored[:pool_size]
+        if context.regenerate_count > 0 and len(pool) > 1:
+            offset = (context.regenerate_count * 3) % len(pool)
+            pool = pool[offset:] + pool[:offset]
+        top = pool[:10]
 
         members_payload = [
             {
@@ -73,6 +78,8 @@ class HybridRecommendationService:
             destinations=dest_payload,
             regenerate_count=context.regenerate_count,
         )
+        if not ai_scores and context.regenerate_count > 0:
+            ai_scores = _fallback_llm_scores(dest_payload, context.regenerate_count)
         ai_by_city = {item["city"].lower(): item for item in ai_scores}
 
         results = []
@@ -107,4 +114,29 @@ class HybridRecommendationService:
                 }
             )
         results.sort(key=lambda r: r["final_score"], reverse=True)
+        if context.regenerate_count > 0 and len(results) > 1:
+            shift = context.regenerate_count % len(results)
+            results = results[shift:] + results[:shift]
         return results
+
+
+def _fallback_llm_scores(destinations: list[dict], regenerate_count: int) -> list[dict]:
+    """Deterministic score variation when Groq is unavailable."""
+    reasons = [
+        "Fresh angle: strong fit for your family's ages and interests.",
+        "Alternative pick with great seasonal appeal for your dates.",
+        "Different vibe — worth exploring for varied activities.",
+        "Rotated suggestion with family-friendly highlights.",
+    ]
+    scores = []
+    for i, dest in enumerate(destinations):
+        base = 55 + (i * 7 + regenerate_count * 11) % 35
+        reason = reasons[(i + regenerate_count) % len(reasons)]
+        scores.append(
+            {
+                "city": dest["city"],
+                "llm_score": float(base),
+                "reason": reason,
+            }
+        )
+    return scores

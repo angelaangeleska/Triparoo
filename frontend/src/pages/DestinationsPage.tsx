@@ -45,7 +45,7 @@ export default function DestinationsPage() {
             Explore destinations
           </h1>
           <p className="text-brand-600 text-lg max-w-xl mx-auto">
-            Hand-picked family-friendly cities across Europe with attractions, accommodations, and seasonal insights.
+            Family-friendly cities across Europe — live flight and hotel prices from Google Travel when available.
           </p>
         </div>
       </FadeIn>
